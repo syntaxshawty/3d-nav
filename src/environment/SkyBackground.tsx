@@ -14,8 +14,19 @@ export function SkyBackground() {
     <>
       <color attach="background" args={[SKY_COLOR]} />
       <fog attach="fog" args={[FOG_COLOR, FOG_NEAR, FOG_FAR]} />
-      {/* background={false}: only provides reflections/IBL for PBR materials (metallic/specular assets render black without this) — doesn't override the flat sky color above */}
-      <Environment preset="park" background={false} />
+      {/*
+        background={false}: only provides reflections/IBL for PBR materials
+        (metallic/specular assets render black without this) — doesn't override
+        the flat sky color above.
+
+        environmentIntensity: an HDRI carries values well above 1.0, so at full
+        strength the sky's specular reflection blew out foliage to white from
+        whatever angle happened to face it — worst on the grass and tree leaf
+        cards, whose normals point every which way. Dialed back far enough to
+        kill the blowout while keeping the diffuse ambient fill, which is doing
+        real work on the shed, deck, and fence.
+      */}
+      <Environment preset="park" background={false} environmentIntensity={0.7} />
     </>
   )
 }
