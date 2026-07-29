@@ -71,8 +71,8 @@ export const plants: PlantData[] = [
   // blackberry cluster already anchored there.
   { id: 'brick-bed', url: '/models/brick_bed.glb', position: [26, 0, -20], rotation: [0, Math.PI * 1.5 , 0], scale: 0.4 },
 
-  { id: 'deck-chair', url: '/models/deck_chair.glb', position: [20, DECK_TOP_Y, -6], rotation: [0, 180, 0], scale: 2.175 },
+  { id: 'deck-chair', url: '/models/deck_chair.glb', position: [20, DECK_TOP_Y, -6], rotation: [0, 180, 0], scale: 2.8 },
   // Shared with interactiveObjects.ts so the real model here and the
   // proximity/interaction entry there always agree on where the pot is.
-  { id: 'strawberry-pot', url: '/models/strawberry_pot.glb', position: STRAWBERRY_POT_POSITION, scale: 1 },
+  { id: 'strawberry-pot', url: '/models/strawberry_pot.glb', position: STRAWBERRY_POT_POSITION, scale: 1.75 },
 ]
