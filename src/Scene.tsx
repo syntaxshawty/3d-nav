@@ -15,6 +15,7 @@ import { Clouds } from './environment/Clouds'
 import { PineForest } from './environment/PineForest'
 import { AnimatedCat } from './components/AnimatedCat'
 import { Backyard } from './environment/Backyard'
+import { Grass } from './environment/Grass'
 
 const GROUND_SIZE = 160  // wide enough that the pine ring and fog hide its edge instead of it cutting off visibly
 
@@ -154,6 +155,7 @@ export function Scene({
       <PineForest />
       <Backyard />
       <Ground />
+      <Grass />
     </>
   )
 }

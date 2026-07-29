@@ -57,6 +57,9 @@ export const plants: PlantData[] = [
   { id: 'nasturtium-0', url: '/models/nasturtium.glb', position: [-2.5, 1, -27], scale: 0.05 },
   { id: 'nasturtium-1', url: '/models/nasturtium.glb', position: [2,    1, -27], scale: 0.05 },
   { id: 'nasturtium-2', url: '/models/nasturtium.glb', position: [6.5,  1, -27], scale: 0.05 },
+  { id: 'nasturtium-3', url: '/models/nasturtium.glb', position: [-2,   0.8, -27], scale: 0.05 },
+  { id: 'nasturtium-4', url: '/models/nasturtium.glb', position: [1.5, 0.8, -27], scale: 0.05 },
+  { id: 'nasturtium-5', url: '/models/nasturtium.glb', position: [5,   0.8, -27], scale: 0.05 },
 
   // Source asset was a huge photogrammetry-scale scan (245MB raw, 16k-square
   // textures, 8.1M vertices) — heavily downsampled during optimize, and
