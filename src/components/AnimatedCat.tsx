@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
@@ -65,8 +65,19 @@ export function AnimatedCat({
   // The model's own visual facing, eased toward yawRef.current each frame —
   // kept separate from yawRef itself, which the controller (App.tsx) turns
   // instantly for movement/camera purposes.
-  const facingYaw = useRef(yawRef.current)
+  const facingYaw = useRef(0)
   const wasMoving = useRef(false)
+
+  // Seeds facingYaw from the controller's actual starting yaw instead of the
+  // 0 placeholder above, so the model doesn't visibly spin from a wrong
+  // assumed default if spawn yaw is ever non-zero. Reading yawRef.current
+  // directly during render (as useRef's lazy initializer) isn't safe — render
+  // can run more than once — so this reads it here instead, in a layout
+  // effect that's guaranteed to run before the first paint and before
+  // useFrame's first tick, so there's no visible frame with the wrong value.
+  useLayoutEffect(() => {
+    facingYaw.current = yawRef.current
+  }, [yawRef])
 
   // The source material is authored with alphaMode=BLEND (transparent=true,
   // depthWrite=false) despite opacity=1 and no alphaMap — a leftover from
