@@ -1,5 +1,7 @@
 import { useEffect, type MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { useTexture } from '@react-three/drei'
+import { RepeatWrapping, SRGBColorSpace } from 'three'
 import type { Movement } from './systems/useInput'
 import { usePlayerController } from './systems/usePlayerController'
 import { useFollowCamera } from './systems/useFollowCamera'
@@ -15,6 +17,37 @@ import { AnimatedCat } from './components/AnimatedCat'
 import { Backyard } from './environment/Backyard'
 
 const GROUND_SIZE = 160  // wide enough that the pine ring and fog hide its edge instead of it cutting off visibly
+
+// Real-world meters one texture tile covers — small enough that individual
+// grass blades in the texture stay crisp instead of smearing across the
+// whole ground plane. This is the flat base layer; 3D grass geometry sits on
+// top of it separately.
+const GROUND_TEXTURE_TILE_SIZE = 2
+const GROUND_TEXTURE_REPEAT    = GROUND_SIZE / GROUND_TEXTURE_TILE_SIZE
+
+function Ground() {
+  // Configured via useTexture's own onLoad callback rather than a separate
+  // effect — mutating a value returned from a hook, after the fact, isn't
+  // allowed (react-hooks/immutability); this is the sanctioned way to
+  // configure a texture at the point it's constructed.
+  const texture = useTexture('/textures/grass_ground.webp', tex => {
+    tex.wrapS = tex.wrapT = RepeatWrapping
+    tex.repeat.set(GROUND_TEXTURE_REPEAT, GROUND_TEXTURE_REPEAT)
+    tex.colorSpace = SRGBColorSpace
+    // Sharper at the shallow viewing angles the low child's-eye camera sees
+    // most of the ground at, where repeat alone still looks blurry/stretched.
+    tex.anisotropy = 8
+  })
+
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
+      <meshStandardMaterial map={texture} />
+    </mesh>
+  )
+}
+
+useTexture.preload('/textures/grass_ground.webp')
 
 function Player({
   movement,
@@ -120,10 +153,7 @@ export function Scene({
       <Deck />
       <PineForest />
       <Backyard />
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
-        <meshStandardMaterial color="lightgreen" />
-      </mesh>
+      <Ground />
     </>
   )
 }
