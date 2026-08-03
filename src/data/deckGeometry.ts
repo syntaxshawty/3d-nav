@@ -101,7 +101,7 @@ export const STAIR_DIR_Z = Math.cos(STAIR_ANGLE)
 export const DECK_SPAWN_POSITION: Vector3Tuple = [
   DECK_POSITION[0] + LEFT_X + TOTAL_WIDTH / 2,
   DECK_POSITION[1] + DECK_TOP_Y,
-  DECK_POSITION[2] - 0.5,
+  DECK_POSITION[2] - 3,
 ]
 export const DECK_SPAWN_YAW = 0
 
