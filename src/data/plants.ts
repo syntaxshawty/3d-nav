@@ -1,25 +1,29 @@
-import { DECK_TOP_Y } from './deckGeometry'
-import { STRAWBERRY_POT_POSITION } from './interactiveObjects'
+import {
+  STRAWBERRY_POT_POSITION, LEMON_TREE_POSITION, PLUM_TREE_POSITION,
+  GARDEN_SHED_POSITION, YARD_TREE_POSITION, BOUGAINVILLEA_POSITION,
+  DECK_CHAIR_POSITION,
+  type Position,
+} from './interactiveObjects'
 
 export interface PlantData {
   id:       string
   url:      string
-  position: [number, number, number]
+  position: Position
   rotation?: [number, number, number]
   scale?:   number | [number, number, number]
 }
 
 // ── Layout ───────────────────────────────────────────────────────────────
 export const plants: PlantData[] = [
-  { id: 'plum-tree', url: '/models/plum_tree.glb', position: [-6, 0, -15], scale: 1 },
-  
-  { id: 'garden-shed', url: '/models/garden_shed.glb', position: [-4.5, 0, -22.5], rotation: [0, Math.PI / 2, 0], scale: 1.5 },
+  { id: 'plum-tree', url: '/models/plum_tree.glb', position: PLUM_TREE_POSITION, scale: 1 },
 
-  { id: 'yard-tree', url: '/models/yard_tree.glb', position: [10, 0, -26], scale: .85 },
+  { id: 'garden-shed', url: '/models/garden_shed.glb', position: GARDEN_SHED_POSITION, rotation: [0, Math.PI / 2, 0], scale: 1.5 },
 
-  { id: 'lemon-tree', url: '/models/lemon_tree.glb', position: [5, 0, -7], rotation: [0, Math.PI / 2, 0], scale: 0.75 },
+  { id: 'yard-tree', url: '/models/yard_tree.glb', position: YARD_TREE_POSITION, scale: .85 },
 
-  { id: 'bougainvillea', url: '/models/bougainvillea.glb', position: [29.5, 0, -7], rotation: [0, Math.PI / 2, 0], scale: 1.5 },
+  { id: 'lemon-tree', url: '/models/lemon_tree.glb', position: LEMON_TREE_POSITION, rotation: [0, Math.PI / 2, 0], scale: 0.75 },
+
+  { id: 'bougainvillea', url: '/models/bougainvillea.glb', position: BOUGAINVILLEA_POSITION, rotation: [0, Math.PI / 2, 0], scale: 1.5 },
 
   { id: 'blackberry-01-1', url: '/models/blackberry_01.glb', position: [35, 0, -35], scale: 5 },
   { id: 'blackberry-02-1', url: '/models/blackberry_02.glb', position: [35, 1, -27], scale: 7 },
@@ -45,7 +49,7 @@ export const plants: PlantData[] = [
 
   { id: 'brick-bed', url: '/models/brick_bed.glb', position: [26, 0, -20], rotation: [0, Math.PI * 1.5 , 0], scale: 0.4 },
 
-  { id: 'deck-chair', url: '/models/deck_chair.glb', position: [20, DECK_TOP_Y, -6], rotation: [0, 180, 0], scale: 2.8 },
+  { id: 'deck-chair', url: '/models/deck_chair.glb', position: DECK_CHAIR_POSITION, rotation: [0, 180, 0], scale: 2.8 },
   
   { id: 'strawberry-pot', url: '/models/strawberry_pot.glb', position: STRAWBERRY_POT_POSITION, scale: 1.75 },
 ]
