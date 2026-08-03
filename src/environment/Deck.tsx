@@ -21,7 +21,7 @@ export function Deck() {
     <group position={DECK_POSITION}>
       <RigidBody type="fixed" colliders="hull">
         {/* Main bar, flush against the house */}
-        <mesh position={[LEFT_X + TOTAL_WIDTH / 2, DECK_CENTER_Y, -MAIN_DEPTH / 2]}>
+        <mesh position={[LEFT_X + TOTAL_WIDTH / 2, DECK_CENTER_Y, -MAIN_DEPTH / 2]} receiveShadow>
           <boxGeometry args={[TOTAL_WIDTH, DECK_HEIGHT, MAIN_DEPTH]} />
           <DeckBaseMaterial />
         </mesh>
@@ -38,7 +38,7 @@ export function Deck() {
             one's collider is a true convex hull of the pentagon rather than
             just its rectangular bounding box — harmless for the other two
             boxes, whose hull is identical to their own shape anyway. */}
-        <mesh position={[0, DECK_BOTTOM_Y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[0, DECK_BOTTOM_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <extrudeGeometry args={[RIGHT_ARM_SHAPE, { depth: DECK_HEIGHT, bevelEnabled: false }]} />
           <DeckBaseMaterial />
         </mesh>
@@ -95,6 +95,7 @@ function PlankSection({
           <mesh
             key={i}
             position={[centerX, DECK_TOP_Y + PLANK_THICKNESS / 2, plankZ0 + depth / 2]}
+            receiveShadow
           >
             <boxGeometry args={[plankWidth, PLANK_THICKNESS, depth]} />
             <meshStandardMaterial color={PLANK_COLORS[i % PLANK_COLORS.length]} roughness={0.85} />

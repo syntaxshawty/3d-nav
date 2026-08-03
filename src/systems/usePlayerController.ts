@@ -6,6 +6,7 @@ import {
   isInsideDeckFootprint,
   STAIR_TOP_POSITION, STAIR_BASE_POSITION, STAIR_DESCEND_YAW, STAIR_ASCEND_YAW,
 } from '../data/deckGeometry'
+import { isInsideHouseFootprint } from '../data/houseGeometry'
 import { SPAWN_POS, SPAWN_YAW } from '../data/spawn'
 import { shortestYawDelta } from '../mathUtils'
 
@@ -132,13 +133,18 @@ export function usePlayerController(
       // While on the deck, a step is only taken if it lands inside the
       // footprint; if the full diagonal step doesn't, each axis is tried on
       // its own so walking into an edge at an angle slides along it instead
-      // of stopping dead. Once off the deck (in the yard), movement is free.
+      // of stopping dead. Once off the deck (in the yard), movement is free
+      // — except into the house's footprint, excluded the same way (same
+      // per-axis slide-along-the-edge fallback) so the player can't walk
+      // through its walls.
+      const canStandAt = (x: number, z: number) =>
+        (!onDeck.current || isInsideDeckFootprint(x, z)) && !isInsideHouseFootprint(x, z)
       const tryMove = (dx: number, dz: number) => {
         const nx = pos.x + dx
         const nz = pos.z + dz
-        if (!onDeck.current || isInsideDeckFootprint(nx, nz)) { pos.x = nx; pos.z = nz; return }
-        if (isInsideDeckFootprint(nx, pos.z)) { pos.x = nx; return }
-        if (isInsideDeckFootprint(pos.x, nz)) { pos.z = nz; return }
+        if (canStandAt(nx, nz)) { pos.x = nx; pos.z = nz; return }
+        if (canStandAt(nx, pos.z)) { pos.x = nx; return }
+        if (canStandAt(pos.x, nz)) { pos.z = nz; return }
       }
       if (m.forward)  tryMove(fwdRef.current.x * SPEED * delta,  fwdRef.current.z * SPEED * delta)
       if (m.backward) tryMove(-fwdRef.current.x * SPEED * delta, -fwdRef.current.z * SPEED * delta)

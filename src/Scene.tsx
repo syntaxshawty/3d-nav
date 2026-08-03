@@ -9,6 +9,7 @@ import { useProximity } from './systems/useProximity'
 import { interactiveObjects, type InteractiveObjectData } from './data/interactiveObjects'
 import { InteractiveObject } from './components/InteractiveObject'
 import { Deck } from './environment/Deck'
+import { House } from './environment/House'
 import { SPAWN_POS } from './data/spawn'
 import { SkyBackground } from './environment/SkyBackground'
 import { Clouds } from './environment/Clouds'
@@ -41,7 +42,7 @@ function Ground() {
   })
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
       <meshStandardMaterial map={texture} />
     </mesh>
@@ -140,7 +141,18 @@ export function Scene({
       <SkyBackground />
       <Clouds />
       <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
+      <directionalLight
+        position={[10, 10, 5]}
+        intensity={1}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-20}
+        shadow-camera-right={40}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
+        shadow-camera-near={0.5}
+        shadow-camera-far={60}
+      />
       <Player
         movement={movement}
         nearbyObjectRef={nearbyObjectRef}
@@ -152,6 +164,7 @@ export function Scene({
         <InteractiveObject key={obj.id} data={obj} />
       ))}
       <Deck />
+      <House />
       <PineForest />
       <Backyard />
       <Ground />

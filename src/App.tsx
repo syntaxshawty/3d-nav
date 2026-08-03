@@ -152,7 +152,7 @@ function GardenView() {
         </div>
       )}
 
-      <Canvas camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }}>
+      <Canvas camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }} shadows>
         <Suspense fallback={null}>
           <Physics>
             <Scene
