@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+import { Billboard, Image } from '@react-three/drei'
 import type { InteractiveObjectData } from '../data/interactiveObjects'
 
 // ── ObjectVisual ──────────────────────────────────────────────────────────────
@@ -10,6 +12,21 @@ function ObjectVisual({ visual }: { visual: InteractiveObjectData['visual'] }) {
       // The real model is rendered elsewhere in the scene — this entry only
       // needs proximity detection and the interaction prompt.
       return null
+
+    case 'image':
+      // A flat, camera-facing photo standing in for real geometry — for
+      // objects with no 3D model, or that aren't physically in the yard
+      // anymore at all. Own Suspense boundary so a slow/missing image only
+      // blanks this one billboard, not the whole scene (App.tsx's Canvas
+      // Suspense wraps everything, with nothing more local in between).
+      if (!visual.image) return null
+      return (
+        <Suspense fallback={null}>
+          <Billboard>
+            <Image url={visual.image} scale={visual.imageScale ?? 1.5} transparent />
+          </Billboard>
+        </Suspense>
+      )
 
     default:
       // Fallback: glowing cube so unknown kinds are always visible in the scene
