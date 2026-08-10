@@ -2,7 +2,10 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
-import { FrontSide, type Group, type Mesh, type MeshStandardMaterial } from 'three'
+import {
+  FrontSide, LoopOnce,
+  type AnimationAction, type Group, type Mesh, type MeshStandardMaterial,
+} from 'three'
 import { shortestYawDelta } from '../mathUtils'
 import { PLANK_THICKNESS, STAIR_SLOPE_PITCH } from '../data/deckGeometry'
 
@@ -42,13 +45,21 @@ const CAT_STAIR_PITCH_SCALE = 2.2
 const CAT_STAIR_PITCH = STAIR_SLOPE_PITCH * CAT_STAIR_PITCH_SCALE
 
 export function AnimatedCat({
-  yawRef, movingRef, stairBlendRef,
+  yawRef, movingRef, stairBlendRef, playAnimationRef, animationLockRef,
 }: {
   yawRef:        MutableRefObject<number>
   movingRef:     MutableRefObject<boolean>
   // 0→1, already smoothed in Player (App.tsx) — shared with the stair-descent
   // camera offsets there so the cat's tilt and the camera move in lockstep.
   stairBlendRef: MutableRefObject<number>
+  // Written here so GardenView's E-key handler can play a one-shot clip
+  // (e.g. SharpenClaws_Vert) from outside this component — same pattern as
+  // usePlayerController's stairActionRef.
+  playAnimationRef: MutableRefObject<(clip: string) => void>
+  // Set true for the one-shot's duration; usePlayerController reads it to
+  // freeze WASD movement/rotation meanwhile, so it's owned jointly with
+  // this component rather than being purely local state here.
+  animationLockRef: MutableRefObject<boolean>
 }) {
   const groupRef = useRef<Group>(null!)
   // Child of groupRef, dedicated to the stair-descent pitch — pitch needs to
@@ -113,13 +124,47 @@ export function AnimatedCat({
     }
   }, [actions])
 
+  // One-shot interaction animations (e.g. SharpenClaws_Vert) — plays a clip
+  // once over the current idle/walk state, then hands back to it. Ignored
+  // while one is already playing (animationLockRef.current) or if the clip
+  // name doesn't exist in this asset, rather than restarting/crashing.
+  useEffect(() => {
+    playAnimationRef.current = (clip: string) => {
+      if (animationLockRef.current) return
+      const action = actions[clip]
+      if (!action) return
+
+      animationLockRef.current = true
+      actions[wasMoving.current ? WALK_CLIP : IDLE_CLIP]?.fadeOut(CROSSFADE_DURATION)
+      action.reset()
+      action.setLoop(LoopOnce, 1)
+      action.clampWhenFinished = true
+      action.fadeIn(CROSSFADE_DURATION).play()
+
+      const mixer = action.getMixer()
+      const onFinished = (event: { action: AnimationAction }) => {
+        if (event.action !== action) return
+        mixer.removeEventListener('finished', onFinished)
+        animationLockRef.current = false
+        // Forces the crossfade check below to treat this as a fresh
+        // transition next frame, so it fades back into whichever of
+        // idle/walk currently applies instead of assuming nothing changed.
+        wasMoving.current = !movingRef.current
+      }
+      mixer.addEventListener('finished', onFinished)
+    }
+  }, [actions, playAnimationRef, animationLockRef, movingRef])
+
   useFrame((_state, delta) => {
     // ── Crossfade idle <-> walk on movement-state change ──────────────────
-    const isMoving = movingRef.current
-    if (isMoving !== wasMoving.current) {
-      actions[wasMoving.current ? WALK_CLIP : IDLE_CLIP]?.fadeOut(CROSSFADE_DURATION)
-      actions[isMoving ? WALK_CLIP : IDLE_CLIP]?.reset().fadeIn(CROSSFADE_DURATION).play()
-      wasMoving.current = isMoving
+    // Skipped entirely while a one-shot interaction animation owns the mixer.
+    if (!animationLockRef.current) {
+      const isMoving = movingRef.current
+      if (isMoving !== wasMoving.current) {
+        actions[wasMoving.current ? WALK_CLIP : IDLE_CLIP]?.fadeOut(CROSSFADE_DURATION)
+        actions[isMoving ? WALK_CLIP : IDLE_CLIP]?.reset().fadeIn(CROSSFADE_DURATION).play()
+        wasMoving.current = isMoving
+      }
     }
 
     // ── Smoothly turn the visible model toward the controller's yaw ───────

@@ -57,17 +57,21 @@ function Player({
   resetRef,
   stairActionRef,
   transitioningRef,
+  playAnimationRef,
+  animationLockRef,
 }: {
   movement:         MutableRefObject<Movement>
   nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
   resetRef:         MutableRefObject<() => void>
   stairActionRef:   MutableRefObject<(direction: 'down' | 'up') => void>
   transitioningRef: MutableRefObject<boolean>
+  playAnimationRef: MutableRefObject<(clip: string) => void>
+  animationLockRef: MutableRefObject<boolean>
 }) {
   const {
     groupRef, yawRef, movingRef, stairBlendRef, fwdRef, stairOrbitTRef,
     reset: resetPlayer,
-  } = usePlayerController(movement, stairActionRef, transitioningRef)
+  } = usePlayerController(movement, stairActionRef, transitioningRef, animationLockRef)
   const { camPosRef, driftActiveRef, reset: resetCamera } = useFollowCamera(
     groupRef, yawRef, fwdRef, stairBlendRef, stairOrbitTRef,
     movement, transitioningRef,
@@ -118,7 +122,13 @@ function Player({
     // directly, not this transform) so AnimatedCat can smooth its visual
     // turn independently of the controller's instant one.
     <group ref={groupRef} position={SPAWN_POS}>
-      <AnimatedCat yawRef={yawRef} movingRef={movingRef} stairBlendRef={stairBlendRef} />
+      <AnimatedCat
+        yawRef={yawRef}
+        movingRef={movingRef}
+        stairBlendRef={stairBlendRef}
+        playAnimationRef={playAnimationRef}
+        animationLockRef={animationLockRef}
+      />
     </group>
   )
 }
@@ -129,12 +139,16 @@ export function Scene({
   resetRef,
   stairActionRef,
   transitioningRef,
+  playAnimationRef,
+  animationLockRef,
 }: {
   movement:         MutableRefObject<Movement>
   nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
   resetRef:         MutableRefObject<() => void>
   stairActionRef:   MutableRefObject<(direction: 'down' | 'up') => void>
   transitioningRef: MutableRefObject<boolean>
+  playAnimationRef: MutableRefObject<(clip: string) => void>
+  animationLockRef: MutableRefObject<boolean>
 }) {
   return (
     <>
@@ -159,6 +173,8 @@ export function Scene({
         resetRef={resetRef}
         stairActionRef={stairActionRef}
         transitioningRef={transitioningRef}
+        playAnimationRef={playAnimationRef}
+        animationLockRef={animationLockRef}
       />
       {interactiveObjects.map(obj => (
         <InteractiveObject key={obj.id} data={obj} />
