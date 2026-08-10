@@ -6,15 +6,26 @@ import { useInput } from './systems/useInput'
 import { type InteractiveObjectData } from './data/interactiveObjects'
 import { ObjectViewer } from './components/ObjectViewer'
 import { ControlsHint } from './components/ControlsHint'
+import { FocusHint } from './components/FocusHint'
+import { ProximityHint } from './components/ProximityHint'
 import { Scene } from './Scene'
 import { SPAWN_CAM_POS } from './data/spawn'
 
 // ── Scale / child's-eye-view tuning ─────────────────────────────────────────
 const CAM_FOV = 58   // narrower than a fisheye-wide FOV — keeps the world from feeling flat/distant
 
-// ── Interaction overlay pacing ───────────────────────────────────────────────
-const OVERLAY_OPEN_DELAY    = 1500   // ms — pause after pressing E before the modal begins to appear, so it reads as a considered beat rather than an instant popup
-const OVERLAY_FADE_DURATION = 0.4   // seconds — opacity transition once it starts appearing
+// ── Focus mode pacing ─────────────────────────────────────────────────────
+// Two-stage reveal: the fog (scene fog + canvas blur + fog gradient) rolls in
+// first, on its own, so the world visibly recedes before any text shows up —
+// then the title/description/image fade in on top of it. Closing reverses
+// the order (content out, then fog out) rather than just running the same
+// timeline backwards.
+const FOG_FADE_DURATION      = 2.5  // seconds — how long the fog itself takes to fade in/out
+const CONTENT_FADE_DURATION  = .5   // seconds — content's own fade + slide, once the fog has arrived
+// Scene desaturates/softens to feel like it's receding into memory, without
+// losing the environment entirely — it stays visible (and interactive)
+// behind the fog.
+const FOCUS_SCENE_FILTER = 'blur(4px) saturate(0.4) brightness(0.75)'
 
 // The walking scene: owns all state, renders HTML layer + Canvas
 function GardenView() {
@@ -25,32 +36,67 @@ function GardenView() {
   const transitioning   = useRef(false)
   const playAnimation   = useRef<(clip: string) => void>(() => {})
   const animationLock   = useRef(false)
+  // Freezes WASD movement/turning for as long as focus mode is open — set
+  // the instant E/Enter is pressed (not waiting on the fog/content fade), so
+  // there's no window where the player can wander off mid-interaction, and
+  // cleared the instant it closes so control comes back immediately rather
+  // than waiting out the closing fade.
+  const movementLock    = useRef(false)
 
   const [activeObject, setActiveObject] = useState<InteractiveObjectData | null>(null)
-  // Drives the overlay's opacity — kept separate from activeObject itself so
-  // the modal can mount (invisible, non-interactive) immediately and then
-  // fade in after a short delay, instead of popping in the instant E is
-  // pressed. Reset to false the moment activeObject clears, so closing stays
-  // instant rather than fading back out.
-  const [overlayVisible, setOverlayVisible] = useState(false)
+  // Drives the fog (scene fog + canvas blur + fog gradient) — the first
+  // stage of the reveal, kept separate from activeObject so it can fade in
+  // after a short delay instead of popping in the instant E is pressed.
+  const [fogVisible, setFogVisible] = useState(false)
+  // Drives the title/description/image fade + slide — the second stage,
+  // only turned on once the fog has finished arriving.
+  const [contentVisible, setContentVisible] = useState(false)
+  // The object actually rendered by focus mode — stays populated until both
+  // stages have finished fading out, so closing has something to animate
+  // instead of the content vanishing instantly.
+  const [focusObject, setFocusObject] = useState<InteractiveObjectData | null>(null)
   // showHint starts true; set to false the first time any movement key is pressed.
   const [showHint, setShowHint] = useState(true)
 
   useEffect(() => {
-    if (!activeObject) {
-      setOverlayVisible(false)
-      return
+    movementLock.current = !!activeObject
+  }, [activeObject])
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    if (activeObject) {
+      setFocusObject(activeObject)
+      // Stage 1: fog rolls in on its own...
+      timers.push(setTimeout(() => {
+        setFogVisible(true)
+        // ...stage 2: content follows once the fog has arrived.
+        timers.push(setTimeout(() => setContentVisible(true), FOG_FADE_DURATION * 1000))
+      }))
+    } else {
+      // Closing reverses the order: content fades out first...
+      setContentVisible(false)
+      timers.push(setTimeout(() => {
+        setFogVisible(false)
+        // ...then the fog, then the object itself unmounts.
+        timers.push(setTimeout(() => setFocusObject(null), FOG_FADE_DURATION * 1000))
+      }, CONTENT_FADE_DURATION * 1000))
     }
-    const timeout = setTimeout(() => setOverlayVisible(true), OVERLAY_OPEN_DELAY)
-    return () => clearTimeout(timeout)
+
+    return () => timers.forEach(clearTimeout)
   }, [activeObject])
 
   // Interaction on E: objects with a scripted `action` (the stair trigger
-  // points) play that instead of opening the info overlay. Blocked while a
+  // points) play that instead of opening focus mode. Blocked while a
   // transition is already playing, so it can't be restarted mid-animation.
+  // Escape closes focus mode from anywhere while it's open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key !== 'e' && e.key !== 'E') || !nearbyObjectRef.current || activeObject || transitioning.current) return
+      if (e.key === 'Escape' && activeObject) {
+        setActiveObject(null)
+        return
+      }
+      if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || transitioning.current) return
       const obj = nearbyObjectRef.current
       if (obj.animation) playAnimation.current(obj.animation)
       if (obj.action === 'descend-stairs')      stairAction.current('down')
@@ -80,8 +126,11 @@ function GardenView() {
     <>
       <ControlsHint visible={showHint} />
 
-      {/* Reset button — always visible, top-right corner */}
-      <button className="reset-button" onClick={() => playerReset.current()}>
+      {/* Reset button — always visible, top-right corner. Non-focusable
+          (tabIndex -1) so it can't retain keyboard focus after a click —
+          otherwise a focused button intercepts the next Enter keypress as a
+          native click, resetting position instead of opening focus mode. */}
+      <button className="reset-button" tabIndex={-1} onClick={() => playerReset.current()}>
         take me home
       </button>
 
@@ -93,54 +142,95 @@ function GardenView() {
       )}
 
       {/* Proximity prompt — content and visibility controlled by useFrame */}
-      <div id="prompt" className="prompt-bubble" />
+      <ProximityHint />
 
-      {/* Overlay — content driven by activeObject data */}
-      {activeObject && (
+      {/* Fog — sits between the (blurred) scene and the floating content,
+          giving the "receding into memory" haze its own layer to fade in on. */}
+      {focusObject && (
         <div
-          className="overlay-backdrop"
+          className="focus-fog"
           style={{
-            opacity: overlayVisible ? 1 : 0,
-            transition: `opacity ${OVERLAY_FADE_DURATION}s ease`,
-            pointerEvents: overlayVisible ? 'auto' : 'none',
+            opacity: fogVisible ? 1 : 0,
+            transition: `opacity ${FOG_FADE_DURATION}s ease`,
           }}
-        >
-          <div className="overlay-card">
-            <h2 className="overlay-title">{activeObject.title}</h2>
-            {activeObject.viewerModel && <ObjectViewer model={activeObject.viewerModel} />}
-            {activeObject.overlayImage && (
-              <img className="overlay-image" src={activeObject.overlayImage} alt={activeObject.title} />
-            )}
-            <p className="overlay-description">{activeObject.description}</p>
-            <div className="overlay-actions">
-              {activeObject.href && (
-                <Link className="overlay-link" to={activeObject.href}>
-                  {activeObject.linkLabel ?? 'Read more'}
+        />
+      )}
+
+      {/* Focus mode — content driven by focusObject data, no card/panel/border.
+          The world stays visible and interactive behind it. Fades in only
+          after the fog above has finished arriving (see the effect above). */}
+      {focusObject && (
+        <div className="focus-content">
+          <div
+            className="focus-layout"
+            style={{
+              opacity: contentVisible ? 1 : 0,
+              transform: contentVisible ? 'translateX(6%) translateY(0)' : 'translateX(6%) translateY(14px)',
+              transition: `opacity ${CONTENT_FADE_DURATION}s ease, transform ${CONTENT_FADE_DURATION}s ease`,
+            }}
+          >
+            <div className="focus-text">
+              <h2 className="focus-title">{focusObject.title}</h2>
+              <hr className="focus-divider" />
+              <p className="focus-description">{focusObject.description}</p>
+              {focusObject.href && (
+                <Link
+                  className="focus-link"
+                  to={focusObject.href}
+                  style={{ pointerEvents: contentVisible ? 'auto' : 'none' }}
+                >
+                  {focusObject.linkLabel ?? 'Read more'}
                 </Link>
               )}
-              <button className="overlay-close-button" onClick={() => setActiveObject(null)}>
-                Close
-              </button>
             </div>
+            {focusObject.viewerModel && (
+              <div className="focus-image-wrap">
+                <ObjectViewer model={focusObject.viewerModel} />
+              </div>
+            )}
+            {focusObject.overlayImage && (
+              <div className="focus-image-wrap">
+                <img className="focus-image" src={focusObject.overlayImage} alt={focusObject.title} />
+                {focusObject.overlayImageGallery && (
+                  <div className="focus-image-gallery">
+                    {focusObject.overlayImageGallery.map(src => (
+                      <img key={src} className="focus-image-gallery-item" src={src} alt={focusObject.title} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <Canvas camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }} shadows>
-        <Suspense fallback={null}>
-          <Physics>
-            <Scene
-              movement={movement}
-              nearbyObjectRef={nearbyObjectRef}
-              resetRef={playerReset}
-              stairActionRef={stairAction}
-              transitioningRef={transitioning}
-              playAnimationRef={playAnimation}
-              animationLockRef={animationLock}
-            />
-          </Physics>
-        </Suspense>
-      </Canvas>
+      <FocusHint visible={contentVisible} />
+
+      <div
+        className="scene-container"
+        style={{
+          filter: fogVisible ? FOCUS_SCENE_FILTER : 'none',
+          transition: `filter ${FOG_FADE_DURATION}s ease`,
+        }}
+      >
+        <Canvas camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }} shadows>
+          <Suspense fallback={null}>
+            <Physics>
+              <Scene
+                movement={movement}
+                nearbyObjectRef={nearbyObjectRef}
+                resetRef={playerReset}
+                stairActionRef={stairAction}
+                transitioningRef={transitioning}
+                playAnimationRef={playAnimation}
+                animationLockRef={animationLock}
+                movementLockRef={movementLock}
+                fogActive={fogVisible}
+              />
+            </Physics>
+          </Suspense>
+        </Canvas>
+      </div>
     </>
   )
 }

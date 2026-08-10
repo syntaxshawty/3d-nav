@@ -73,92 +73,149 @@ body {
   white-space: pre;
 }
 
-/* Proximity prompt — display and text are toggled by direct DOM writes (see
-   useProximity.ts) rather than React state; this only sets its resting look. */
-.prompt-bubble {
-  display: none;
-  position: fixed;
-  bottom: 28%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 8px 18px;
-  border-radius: 6px;
-  font-family: 'Freckle Face', system-ui;
-  font-size: 15px;
-  letter-spacing: 0.03em;
-  pointer-events: none;
-  z-index: 50;
-  white-space: nowrap;
+/* ── Focus mode ────────────────────────────────────────────────────────────
+   Replaces the old centered dialog: the world stays visible but recedes
+   (blurred/desaturated behind a fog gradient) while the object's title,
+   text and image float directly over it — no panel, no card, no border.
+   filter/opacity/transform values that animate the fade are set inline
+   (see App.tsx) since they're driven by fogVisible/contentVisible state;
+   everything static about each layer's look lives here. */
+
+/* Wraps the R3F Canvas so it (and only it) can be blurred/desaturated —
+   the HUD elements (debug panel, reset button, proximity prompt) render
+   as siblings above this and stay crisp regardless. */
+.scene-container {
+  width: 100%;
+  height: 100%;
 }
 
-.overlay-backdrop {
+/* Soft, slightly-off-center haze that sits between the blurred scene and
+   the floating text/image — this is what actually reads as "fog" rather
+   than just a blurred photo. The base gradient sets the overall shape/color;
+   ::before/::after add real texture and motion on top of it (see below). */
+/* Static haze + vignette — no drift/breathe animation. The vignette
+   (transparent center, darkening toward the edges) pulls focus toward the
+   floating content the same way the old animated noise did, without the
+   per-frame cost or motion. The layer's own opacity still fades in/out
+   under App.tsx's fogVisible control (see FOG_FADE_DURATION). */
+.focus-fog {
   position: fixed;
   inset: 0;
+  z-index: 150;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 60% at 62% 45%, rgba(230, 233, 240, 0.22), transparent 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 40%, rgba(4, 5, 9, 0.7) 100%),
+    linear-gradient(rgba(8, 10, 16, 0.35), rgba(8, 10, 16, 0.55));
+}
+
+.focus-content {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 200;
+  /* Only specific children (e.g. the read-more link) opt back into pointer
+     events — the rest lets clicks/drags reach the world underneath. */
+  pointer-events: none;
 }
 
-.overlay-card {
-  background: rgba(10, 10, 20, 0.88);
-  color: white;
-  padding: 2rem 2.5rem;
-  border-radius: 12px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-  font-family: 'Freckle Face', system-ui;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.overlay-title {
-  margin: 0 0 0.75rem;
-  font-size: 1.5rem;
-  font-weight: 400;
-}
-
-.overlay-image {
-  max-width: 100%;
-  max-height: 260px;
-  display: block;
-  margin: 0 auto 1rem;
-  border-radius: 10px;
-}
-
-.overlay-description {
-  margin: 0 0 1.5rem;
-  color: #aaa;
-  line-height: 1.6;
-  font-size: 0.95rem;
-}
-
-.overlay-actions {
+.focus-layout {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 4.5rem;
+  width: min(94vw, 1180px);
+  /* "Anchored in the world" rather than dead-center — nudges the whole
+     composition right of center, per the reference layout. */
+  transform: translateX(6%);
+}
+
+.focus-text {
+  flex: 0 0 40%;
+  text-align: left;
+}
+
+.focus-image-wrap {
+  flex: 0 0 60%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  gap: 1.5rem;
 }
 
-.overlay-link {
-  padding: 0.5rem 1.25rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.12);
+.focus-title {
+  margin: 0;
+  font-family: 'Freckle Face', system-ui;
+  font-weight: 400;
+  font-size: clamp(2.25rem, 3.8vw, 3.25rem);
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  text-decoration: none;
-  font-size: 1.2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85), 0 10px 28px rgba(0, 0, 0, 0.55);
 }
 
-.overlay-close-button {
-  padding: 0.5rem 1.25rem;
-  background: white;
-  color: #111;
+.focus-divider {
+  width: 64px;
+  height: 2px;
+  margin: 1.1rem 0 1.5rem;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+.focus-description {
+  margin: 0;
+  font-family: 'Freckle Face', system-ui;
+  font-size: 1.25rem;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.focus-link {
+  display: inline-block;
+  margin-top: 1.25rem;
+  color: white;
+  font-family: 'Freckle Face', system-ui;
+  font-size: 1.1rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 6px 18px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.focus-link:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* The keepsake itself — depth comes from drop-shadow following the image's
+   own alpha shape, not a box-shadow on a container, so cutout/transparent
+   scans (recipe cards, photos) read as physical objects, not framed art. */
+.focus-image {
+  display: block;
+  max-width: min(46vw, 440px);
+  max-height: 46vh;
+  filter:
+    drop-shadow(0 22px 28px rgba(0, 0, 0, 0.5))
+    drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+
+/* Extra keepsakes shown beneath the main overlay image (see
+   overlayImageGallery) — a fixed 2x2 grid of smaller scans, same
+   drop-shadow treatment as .focus-image but lighter since they sit smaller
+   and denser on the page. */
+.focus-image-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  max-width: min(46vw, 440px);
+}
+
+.focus-image-gallery-item {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter:
+    drop-shadow(0 12px 16px rgba(0, 0, 0, 0.5))
+    drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
 }
