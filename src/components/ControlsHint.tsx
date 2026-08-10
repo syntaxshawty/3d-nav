@@ -1,15 +1,17 @@
 // One keyboard key: outlined rectangle with a centred label, no fill.
-function Key({ x, y, label, size = 34 }: { x: number; y: number; label: string; size?: number }) {
+// Exported so other hints (e.g. the focus-mode Esc key) can reuse the same look.
+export function Key({ x, y, label, size = 34, width }: { x: number; y: number; label: string; size?: number; width?: number }) {
+  const w = width ?? size
   return (
     <g>
       <rect
-        x={x} y={y} width={size} height={size} rx={5}
+        x={x} y={y} width={w} height={size} rx={5}
         fill="rgba(255,255,255,0.06)"
         stroke="rgba(255,255,255,0.65)"
         strokeWidth={1.5}
       />
       <text
-        x={x + size / 2}
+        x={x + w / 2}
         y={y + size / 2}
         textAnchor="middle"
         dominantBaseline="central"
