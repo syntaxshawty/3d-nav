@@ -1,3 +1,13 @@
+/* Font itself is loaded via <link> in index.html (preconnect + stylesheet)
+   rather than @import here — @import would force the browser to fetch and
+   parse this file first, discover the import, then start the font request,
+   adding a serial round-trip before text renders in the right font. */
+.freckle-face-regular {
+  font-family: "Freckle Face", system-ui;
+  font-weight: 400;
+  font-style: normal;
+}
+
 /* Reset browser defaults so there are no scrollbars or gaps around the canvas */
 * {
   margin: 0;
@@ -10,10 +20,145 @@ html,
 body {
   width: 100%;
   height: 100%;
+  /* Site-wide default — most UI text still sets fontFamily inline (App.tsx,
+     ControlsHint.tsx) and needs updating to match, since an inline style
+     always wins over this; this covers anything new that doesn't set its own. */
+  font-family: 'Freckle Face', system-ui;
 }
 
 /* The Canvas component fills 100% of its parent, so #root must fill the viewport */
 #root {
   width: 100%;
   height: 100%;
+}
+
+/* ── GardenView (App.tsx) ─────────────────────────────────────────────────── */
+
+.reset-button {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: 'Freckle Face', system-ui;
+  font-size: 15px;
+  z-index: 100;
+}
+
+.reset-button:hover {
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+}
+
+/* Dev-only player/camera readout, updated by direct DOM writes (see
+   Scene.tsx) rather than React state, so display/content stay untouched here. */
+.debug-panel {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #00ff88;
+  font-family: monospace;
+  font-size: 15px;
+  line-height: 1.7;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 100;
+  white-space: pre;
+}
+
+/* Proximity prompt — display and text are toggled by direct DOM writes (see
+   useProximity.ts) rather than React state; this only sets its resting look. */
+.prompt-bubble {
+  display: none;
+  position: fixed;
+  bottom: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-family: 'Freckle Face', system-ui;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  z-index: 50;
+  white-space: nowrap;
+}
+
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 200;
+}
+
+.overlay-card {
+  background: rgba(10, 10, 20, 0.88);
+  color: white;
+  padding: 2rem 2.5rem;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  font-family: 'Freckle Face', system-ui;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.overlay-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.overlay-image {
+  max-width: 100%;
+  max-height: 260px;
+  display: block;
+  margin: 0 auto 1rem;
+  border-radius: 10px;
+}
+
+.overlay-description {
+  margin: 0 0 1.5rem;
+  color: #aaa;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.overlay-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.overlay-link {
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  text-decoration: none;
+  font-size: 1.2rem;
+}
+
+.overlay-close-button {
+  padding: 0.5rem 1.25rem;
+  background: white;
+  color: #111;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2rem;
 }
