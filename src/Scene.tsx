@@ -59,6 +59,7 @@ function Player({
   transitioningRef,
   playAnimationRef,
   animationLockRef,
+  movementLockRef,
 }: {
   movement:         MutableRefObject<Movement>
   nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
@@ -67,16 +68,17 @@ function Player({
   transitioningRef: MutableRefObject<boolean>
   playAnimationRef: MutableRefObject<(clip: string) => void>
   animationLockRef: MutableRefObject<boolean>
+  movementLockRef:  MutableRefObject<boolean>
 }) {
   const {
-    groupRef, yawRef, movingRef, stairBlendRef, fwdRef, stairOrbitTRef,
+    groupRef, yawRef, movingRef, stairBlendRef, fwdRef, stairOrbitTRef, stairActiveRef,
     reset: resetPlayer,
-  } = usePlayerController(movement, stairActionRef, transitioningRef, animationLockRef)
+  } = usePlayerController(movement, stairActionRef, transitioningRef, animationLockRef, movementLockRef)
   const { camPosRef, driftActiveRef, reset: resetCamera } = useFollowCamera(
     groupRef, yawRef, fwdRef, stairBlendRef, stairOrbitTRef,
     movement, transitioningRef,
   )
-  const { closestDistRef } = useProximity(groupRef, nearbyObjectRef, transitioningRef)
+  const { closestDistRef } = useProximity(groupRef, nearbyObjectRef, transitioningRef, movementLockRef)
 
   // Write the reset function into the ref so GardenView can call it from a
   // button. Composes each system's own reset — every system owns resetting
@@ -125,7 +127,7 @@ function Player({
       <AnimatedCat
         yawRef={yawRef}
         movingRef={movingRef}
-        stairBlendRef={stairBlendRef}
+        stairActiveRef={stairActiveRef}
         playAnimationRef={playAnimationRef}
         animationLockRef={animationLockRef}
       />
@@ -141,6 +143,8 @@ export function Scene({
   transitioningRef,
   playAnimationRef,
   animationLockRef,
+  movementLockRef,
+  fogActive,
 }: {
   movement:         MutableRefObject<Movement>
   nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
@@ -149,10 +153,12 @@ export function Scene({
   transitioningRef: MutableRefObject<boolean>
   playAnimationRef: MutableRefObject<(clip: string) => void>
   animationLockRef: MutableRefObject<boolean>
+  movementLockRef:  MutableRefObject<boolean>
+  fogActive:      boolean
 }) {
   return (
     <>
-      <SkyBackground />
+      <SkyBackground fogActive={fogActive} />
       <Clouds />
       <ambientLight intensity={0.6} />
       <directionalLight
@@ -175,6 +181,7 @@ export function Scene({
         transitioningRef={transitioningRef}
         playAnimationRef={playAnimationRef}
         animationLockRef={animationLockRef}
+        movementLockRef={movementLockRef}
       />
       {interactiveObjects.map(obj => (
         <InteractiveObject key={obj.id} data={obj} />
