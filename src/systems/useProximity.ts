@@ -8,12 +8,13 @@ import { interactiveObjects, type InteractiveObjectData } from '../data/interact
 const OBJECT_POSITIONS = interactiveObjects.map(o => new Vector3(...o.position))
 
 // Finds the nearest interactive object within range each frame, writes it
-// into nearbyObjectRef (read by GardenView's E-key handler), and drives the
-// on-screen "Press E..." prompt directly via the DOM.
+// into nearbyObjectRef (read by GardenView's Enter-key handler), and drives
+// the on-screen ProximityHint prompt directly via the DOM.
 export function useProximity(
   groupRef: RefObject<Group>,
   nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>,
   transitioningRef: MutableRefObject<boolean>,
+  movementLockRef: MutableRefObject<boolean>,
 ) {
   // Exposed only for the dev debug overlay.
   const closestDistRef = useRef(Infinity)
@@ -33,16 +34,21 @@ export function useProximity(
     nearbyObjectRef.current = found
     closestDistRef.current  = closestDist
 
-    // Prompt: update text from data and toggle visibility — no React re-render.
+    // Prompt: update caption text from data and fade visibility — no React
+    // re-render. Only the caption span's text is touched; the Enter-key SVG
+    // stays in place so the opacity transition on the container fades the
+    // whole hint as a unit instead of the key glyph popping in and out.
     // Hidden during the scripted stair transition itself so it doesn't flash
-    // "press E" again mid-animation, on approach to the opposite end's trigger.
+    // "Enter" again mid-animation, on approach to the opposite end's
+    // trigger, and hidden while the overlay is open (movementLockRef).
     const promptEl = document.getElementById('prompt')
     if (promptEl) {
-      if (found && !transitioningRef.current) {
-        promptEl.textContent   = found.prompt
-        promptEl.style.display = 'block'
+      if (found && !transitioningRef.current && !movementLockRef.current) {
+        const captionEl = document.getElementById('prompt-caption')
+        if (captionEl) captionEl.textContent = found.prompt
+        promptEl.style.opacity = '1'
       } else {
-        promptEl.style.display = 'none'
+        promptEl.style.opacity = '0'
       }
     }
   })
