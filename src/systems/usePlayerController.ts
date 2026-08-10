@@ -45,6 +45,11 @@ export function usePlayerController(
   transitioningRef: MutableRefObject<boolean>,
   // freeze movement during cat animation
   animationLockRef: MutableRefObject<boolean>,
+  // freeze movement while focus mode (the fog/text overlay) is open — kept
+  // separate from animationLockRef since the two can be active at once (an
+  // object with both `animation` and a focus overlay) and are cleared
+  // independently, on their own unrelated timers.
+  movementLockRef: MutableRefObject<boolean>,
 ) {
   const groupRef = useRef<Group>(null!);
   const yawRef = useRef(SPAWN_YAW);
@@ -131,7 +136,7 @@ export function usePlayerController(
         -Math.cos(yawRef.current),
       );
       if (t >= 1) scripted.current = false;
-    } else if (!animationLockRef.current) {
+    } else if (!animationLockRef.current && !movementLockRef.current) {
       // ── Rotation ────────────────────────────────────────────────────────
       // Note: this group's own rotation is intentionally never set from yaw
       // — yawRef alone drives the camera and movement math, and AnimatedCat
@@ -240,6 +245,10 @@ export function usePlayerController(
     stairBlendRef,
     fwdRef,
     stairOrbitTRef,
+    // Exposed so AnimatedCat can play JumpFw_IP instead of the normal
+    // walk cycle for exactly the scripted transition's duration (both
+    // directions), rather than inferring it from movingRef alone.
+    stairActiveRef: scripted,
     reset,
   };
 }
