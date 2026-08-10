@@ -26,11 +26,17 @@ export interface InteractiveObjectData {
   href?: string; // optional internal route for a full page
   linkLabel?: string; // button label for href (defaults to "Read more")
   viewerModel?: string; // GLB path — if set, the overlay shows a spinnable 3D preview of this model
+  overlayImage?: string; // photo path — if set, the overlay shows this image above the description (e.g. a scanned keepsake related to the object)
   // If set, E plays this scripted movement instead of opening the info
   // overlay — see the stair-transition handling in App.tsx. title/description
   // are unused for these (the overlay never opens) but stay required so every
   // entry still reads as a real object at a glance.
   action?: 'descend-stairs' | 'ascend-stairs';
+  // If set, E also plays this clip name (from cat_animated.glb) once on the
+  // player's avatar, alongside the normal info overlay — see AnimatedCat.tsx.
+  // Movement locks for the clip's duration (same transitioningRef the stair
+  // transition uses), so unlike `action` this doesn't replace the overlay.
+  animation?: string;
   visual: {
     kind: string; // determines which geometry to render: 'none' | 'flower' | 'bench' | 'image' | ...
     color?: string; // primary color passed to the visual
@@ -68,7 +74,7 @@ export const NASTURTIUM_POSITION: Position = [2, 1, -27];
 // back-right corner as one bramble patch. Anchored to blackberry-02-1's own
 // position (one real instance, roughly central to the cluster) rather than
 // a synthetic centroid; a wide interactionRadius stands in for the patch.
-export const BLACKBERRY_POSITION: Position = [15, 1, -24];
+export const BLACKBERRY_POSITION: Position = [16, 1, -24];
 
 // The house's front (yard-facing) door doesn't have its own world-space
 // position — it's rendered as a child of House's group, offset from
@@ -147,6 +153,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: YARD_TREE_POSITION,
     interactionRadius: 2.5,
     prompt: 'Press E to inspect',
+    animation: 'SharpenClaws_Vert',
     visual: { kind: 'none' },
   },
   {
@@ -179,11 +186,12 @@ export const interactiveObjects: InteractiveObjectData[] = [
     // 7-instance bramble patch spread across ~20x11 units (see
     // BLACKBERRY_POSITION above), not one object.
     id: 'blackberries',
-    title: 'Blackberry Bushes',
+    title: 'Blackberry Bush',
     description:
       'An unruly bush beaten back once a year by my father, many harvests in the summertime ensured a surplus stock of frozen blackberries all year for pancakes and pies. My neighbor Myrna taught me how to bake my first pie with the berries from our yard. She lived on the corner, two doors down. The walls of her home were lined with hundreds of antique salt and pepper shakers. ',
+    overlayImage: '/photos/berry-pie-recipe.png',
     position: BLACKBERRY_POSITION,
-    interactionRadius: 6,
+    interactionRadius: 2,
     prompt: 'Press E to inspect',
     visual: { kind: 'none' },
   },
