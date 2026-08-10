@@ -19,17 +19,13 @@ function ViewerModel({ url }: { url: string }) {
   return <Clone object={scene} />
 }
 
+// No card background/border here by design — the model floats directly over
+// the fogged scene like the image keepsakes do, just with its own camera
+// instead of a flat <img>.
 export function ObjectViewer({ model }: { model: string }) {
   return (
-    <div
-      style={{
-        width: VIEWER_SIZE, height: VIEWER_SIZE, margin: '0 auto 1rem',
-        borderRadius: '10px', overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.15)',
-        background: 'radial-gradient(circle at 50% 40%, #2a2a35, #16161d)',
-      }}
-    >
-      <Canvas camera={{ position: CAMERA_POSITION, fov: 40 }}>
+    <div style={{ width: VIEWER_SIZE, height: VIEWER_SIZE }}>
+      <Canvas camera={{ position: CAMERA_POSITION, fov: 40 }} gl={{ alpha: true }}>
         <ambientLight intensity={0.8} />
         <directionalLight position={[4, 6, 4]} intensity={1.2} />
         <directionalLight position={[-4, -2, -4]} intensity={0.3} />

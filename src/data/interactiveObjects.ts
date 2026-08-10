@@ -22,11 +22,12 @@ export interface InteractiveObjectData {
   description: string;
   position: Position;
   interactionRadius: number; // player must be within this many units to trigger a prompt
-  prompt: string; // text shown in the proximity prompt
+  prompt: string; // caption shown next to the Enter-key glyph in the proximity prompt (e.g. "to inspect")
   href?: string; // optional internal route for a full page
   linkLabel?: string; // button label for href (defaults to "Read more")
   viewerModel?: string; // GLB path — if set, the overlay shows a spinnable 3D preview of this model
   overlayImage?: string; // photo path — if set, the overlay shows this image above the description (e.g. a scanned keepsake related to the object)
+  overlayImageGallery?: string[]; // additional photo paths — if set, rendered as a 2x2 grid beneath overlayImage
   // If set, E plays this scripted movement instead of opening the info
   // overlay — see the stair-transition handling in App.tsx. title/description
   // are unused for these (the overlay never opens) but stay required so every
@@ -95,11 +96,10 @@ export const interactiveObjects: InteractiveObjectData[] = [
     id: 'strawberry-pot',
     title: 'Strawberry Pot',
     description:
-      'The terra cotta pot lasted far longer than the berries ever did. We grew strawberries in the front yard too, next to the baby pine tree I planted which was later cut down (</3) because it grew so big and strong that its roots started cracking and lifting the concrete walkway to the house. ',
+      'The terra cotta pot lasted far longer than the berries ever did. We grew strawberries in the front yard too, next to the baby pine tree I planted which was later cut down (</3) because it grew so big and strong that its roots started cracking and lifting the concrete walkway to the house... ',
     position: STRAWBERRY_POT_POSITION,
     interactionRadius: 2.5,
-    prompt:
-      'A plump berry is ready to pick! Will you pick it? Press E to inspect.',
+    prompt: 'to inspect',
     viewerModel: '/models/strawberry.glb',
     // 'none': the pot itself is already rendered by Backyard.tsx (as the real
     // GLB prop) — this entry only adds proximity detection and the popup.
@@ -114,8 +114,8 @@ export const interactiveObjects: InteractiveObjectData[] = [
     description:
       'We had two lemon trees but only one stands now. One tree was home to a bluejay for some years. He would land on my head and eat peanuts out of my hand. The Meyer lemon tree drew stealthy neighbors into the backyard, its fruit traveled thousands of miles every year as gifts for grandmas and produced countless jugs of perfectly refreshing lemonade. ',
     position: LEMON_TREE_POSITION,
-    interactionRadius: 2.5,
-    prompt: 'Press E to inspect',
+    interactionRadius: 3,
+    prompt: 'to inspect',
     // 'none': the tree itself is already rendered by Backyard.tsx via
     // plants.ts (as the real GLB prop) — this entry only adds proximity
     // detection and the popup.
@@ -129,7 +129,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'Juicy, sweet, dark plums, the only plums I’ve ever loved. The tree is gone now. I don’t eat plums anymore; they have become a source of deep disappointment. Each pithy, hard, flavorless plum I eat causes me to question the memory of the delicious plums I once knew… I avoid plums now to preserve the memory of the plums I loved so much. ',
     position: PLUM_TREE_POSITION,
     interactionRadius: 2.5,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     // 'none': already rendered by Backyard.tsx via plants.ts.
     visual: { kind: 'none' },
   },
@@ -141,7 +141,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'I don’t go in here; I don’t know what is in here. This shed wasn’t around when I was young, it is evidence of passing time and a reminder of my absence. I’m not sure when it got there. ',
     position: GARDEN_SHED_POSITION,
     interactionRadius: 3,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     visual: { kind: 'none' },
   },
   {
@@ -152,7 +152,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'The most beautiful and bountiful pink flowers bloom from this camellia bush (which looks much more like a tree than a bush) but when the flowers fall they create a disgusting mass grave of rotting brown flower corpses. Something so beautiful can be so foul. ',
     position: YARD_TREE_POSITION,
     interactionRadius: 2.5,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     animation: 'SharpenClaws_Vert',
     visual: { kind: 'none' },
   },
@@ -164,7 +164,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'The most vibrant color, an explosion of papery petals, such an unnatural hue. This vine would grow largely untamed, for years, until it would begin to fall and encroach upon the walkway on the side of the house used by occasionally by us and, more often, local deer. Dad used wire and screws to train it against the fence, but no more than necessary. ',
     position: BOUGAINVILLEA_POSITION,
     interactionRadius: 2.5,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     visual: { kind: 'none' },
   },
   {
@@ -177,7 +177,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'Grandma told me these flowers are edible so I would try one every-once-in-a-while, just to confirm. They would be a great addition to a fancy salad... Spicy, peppery, and sweet depending on age. Also, Beaches’ favorite resting spot. ',
     position: NASTURTIUM_POSITION,
     interactionRadius: 4,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     visual: { kind: 'none' },
   },
   {
@@ -190,9 +190,15 @@ export const interactiveObjects: InteractiveObjectData[] = [
     description:
       'An unruly bush beaten back once a year by my father, many harvests in the summertime ensured a surplus stock of frozen blackberries all year for pancakes and pies. My neighbor Myrna taught me how to bake my first pie with the berries from our yard. She lived on the corner, two doors down. The walls of her home were lined with hundreds of antique salt and pepper shakers. ',
     overlayImage: '/photos/berry-pie-recipe.png',
+    overlayImageGallery: [
+      '/photos/pie-1.png',
+      '/photos/pie-2.png',
+      '/photos/pie-3.png',
+      '/photos/pie-4.png',
+    ],
     position: BLACKBERRY_POSITION,
     interactionRadius: 2,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     visual: { kind: 'none' },
   },
   {
@@ -203,7 +209,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'An ideal spot to enjoy a chocolate old fashioned from Red’s or a cinnamon roll from Pavel’s with a banana and black coffee, while reading the weekly newspaper to find a movie or play to attend. Maybe the outdoor forest theatre is open this time of year? ',
     position: DECK_CHAIR_POSITION,
     interactionRadius: 1.5,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     visual: { kind: 'none' },
   },
   {
@@ -214,7 +220,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
       'The French doors were installed backwards by the previous owner. They have since been replaced.',
     position: BACK_DOORS_POSITION,
     interactionRadius: 2,
-    prompt: 'Press E to inspect',
+    prompt: 'to inspect',
     // 'none': the doors are rendered by House.tsx, not plants.ts, but the
     // pattern's the same — this entry only adds proximity/popup on top.
     visual: { kind: 'none' },
@@ -225,7 +231,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
     description: '',
     position: STAIR_TOP_POSITION,
     interactionRadius: 1.8,
-    prompt: 'Press E to go down to the yard',
+    prompt: 'to go down to the yard',
     action: 'descend-stairs',
     // The stairs themselves are already rendered by Deck.tsx.
     visual: { kind: 'none' },
@@ -236,7 +242,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
     description: '',
     position: STAIR_BASE_POSITION,
     interactionRadius: 1.8,
-    prompt: 'Press E to go up to the deck',
+    prompt: 'to go up to the deck',
     action: 'ascend-stairs',
     visual: { kind: 'none' },
   },
