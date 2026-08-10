@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
@@ -7,18 +7,20 @@ import {
   type AnimationAction, type Group, type Mesh, type MeshStandardMaterial,
 } from 'three'
 import { shortestYawDelta } from '../mathUtils'
-import { PLANK_THICKNESS, STAIR_SLOPE_PITCH } from '../data/deckGeometry'
+import { PLANK_THICKNESS } from '../data/deckGeometry'
 
 // The player's visible model — an animated cat, replacing the earlier
 // procedural bunny. Sourced from a large general-purpose quadruped
-// animation library (124 clips); only the two locomotion states this
-// project actually drives (idle, forward walk) are used. Clip names below
-// are exact matches confirmed against the source file's own clip list
-// (also logged once on mount, below, in case the source file ever changes).
+// animation library (124 clips); only the locomotion states this project
+// actually drives (idle, forward walk, stair jump) are used. Clip names
+// below are exact matches confirmed against the source file's own clip list.
 const CAT_URL   = '/models/cat_animated.glb'
-const IDLE_CLIP = 'Idle_1'
-const WALK_CLIP = 'Walk_F_IP'
-const CROSSFADE_DURATION = 0.3   // seconds, idle <-> walk
+const IDLE_CLIP  = 'Idle_1'
+const WALK_CLIP  = 'Walk_F_IP'
+// Plays for the scripted stair transition's duration (both directions)
+// instead of the normal walk cycle — see stairActiveRef below.
+const STAIR_CLIP = 'JumpFw_IP'
+const CROSSFADE_DURATION = 0.3   // seconds, between any two of the above
 
 // The raw model loads at real-world cat size (~0.45m tall) with its own
 // rest-pose facing, neither of which match this project's child-scaled
@@ -36,22 +38,15 @@ const CAT_FACING_YAW = Math.PI   // rest pose faces +Z (toward the camera); this
 
 const ROTATION_LERP = 0.15   // fraction of the remaining turn closed per ~frame at 60fps
 
-// Downward body pitch while descending the stairs, at full blend — based on
-// the stairs' real slope (STAIR_SLOPE_PITCH, computed from actual rise/run
-// in Deck.tsx) rather than a guessed angle, scaled up since the true slope
-// alone read as too subtle to notice. Tune CAT_STAIR_PITCH_SCALE if it needs
-// to be more/less dramatic.
-const CAT_STAIR_PITCH_SCALE = 2.2
-const CAT_STAIR_PITCH = STAIR_SLOPE_PITCH * CAT_STAIR_PITCH_SCALE
-
 export function AnimatedCat({
-  yawRef, movingRef, stairBlendRef, playAnimationRef, animationLockRef,
+  yawRef, movingRef, stairActiveRef, playAnimationRef, animationLockRef,
 }: {
   yawRef:        MutableRefObject<number>
   movingRef:     MutableRefObject<boolean>
-  // 0→1, already smoothed in Player (App.tsx) — shared with the stair-descent
-  // camera offsets there so the cat's tilt and the camera move in lockstep.
-  stairBlendRef: MutableRefObject<number>
+  // True for the scripted stair transition's duration (both directions) —
+  // takes priority over movingRef so JumpFw_IP plays instead of the normal
+  // walk cycle while it's carrying the player up/down.
+  stairActiveRef: MutableRefObject<boolean>
   // Written here so GardenView's E-key handler can play a one-shot clip
   // (e.g. SharpenClaws_Vert) from outside this component — same pattern as
   // usePlayerController's stairActionRef.
@@ -62,14 +57,6 @@ export function AnimatedCat({
   animationLockRef: MutableRefObject<boolean>
 }) {
   const groupRef = useRef<Group>(null!)
-  // Child of groupRef, dedicated to the stair-descent pitch — pitch needs to
-  // apply in the *already-yawed* local frame, not as an independent Euler
-  // component alongside rotation.y on the same object. Setting rotation.x
-  // and rotation.y directly on one Object3D composes them in a fixed
-  // world-axis order, which (once yaw is non-zero, e.g. facing down the
-  // diagonal stairs) reads as a sideways lean instead of a pure forward
-  // pitch. Nesting pitch inside the yawed group is the standard fix.
-  const pitchGroupRef = useRef<Group>(null!)
   const { scene, animations } = useGLTF(CAT_URL)
   const { actions } = useAnimations(animations, groupRef)
 
@@ -77,7 +64,11 @@ export function AnimatedCat({
   // kept separate from yawRef itself, which the controller (App.tsx) turns
   // instantly for movement/camera purposes.
   const facingYaw = useRef(0)
-  const wasMoving = useRef(false)
+  // Name of whichever of IDLE_CLIP/WALK_CLIP/STAIR_CLIP is currently
+  // playing — crossfades to a new one only when the target actually
+  // changes, so idle/walk/stair-jump all share one switch instead of each
+  // pair needing its own boolean.
+  const currentClipRef = useRef(IDLE_CLIP)
 
   // Seeds facingYaw from the controller's actual starting yaw instead of the
   // 0 placeholder above, so the model doesn't visibly spin from a wrong
@@ -124,8 +115,17 @@ export function AnimatedCat({
     }
   }, [actions])
 
+  // Whichever of idle/walk/stair-jump applies right now, in priority order —
+  // stairActiveRef wins over movingRef since the scripted transition also
+  // sets movingRef true (the cat should visibly travel, not idle, while
+  // being carried up/down).
+  const resolveLocomotionClip = useCallback(
+    () => (stairActiveRef.current ? STAIR_CLIP : movingRef.current ? WALK_CLIP : IDLE_CLIP),
+    [stairActiveRef, movingRef],
+  )
+
   // One-shot interaction animations (e.g. SharpenClaws_Vert) — plays a clip
-  // once over the current idle/walk state, then hands back to it. Ignored
+  // once over the current locomotion state, then hands back to it. Ignored
   // while one is already playing (animationLockRef.current) or if the clip
   // name doesn't exist in this asset, rather than restarting/crashing.
   useEffect(() => {
@@ -135,7 +135,7 @@ export function AnimatedCat({
       if (!action) return
 
       animationLockRef.current = true
-      actions[wasMoving.current ? WALK_CLIP : IDLE_CLIP]?.fadeOut(CROSSFADE_DURATION)
+      actions[currentClipRef.current]?.fadeOut(CROSSFADE_DURATION)
       action.reset()
       action.setLoop(LoopOnce, 1)
       action.clampWhenFinished = true
@@ -146,24 +146,23 @@ export function AnimatedCat({
         if (event.action !== action) return
         mixer.removeEventListener('finished', onFinished)
         animationLockRef.current = false
-        // Forces the crossfade check below to treat this as a fresh
-        // transition next frame, so it fades back into whichever of
-        // idle/walk currently applies instead of assuming nothing changed.
-        wasMoving.current = !movingRef.current
+        const resumeClip = resolveLocomotionClip()
+        actions[resumeClip]?.reset().fadeIn(CROSSFADE_DURATION).play()
+        currentClipRef.current = resumeClip
       }
       mixer.addEventListener('finished', onFinished)
     }
-  }, [actions, playAnimationRef, animationLockRef, movingRef])
+  }, [actions, playAnimationRef, animationLockRef, resolveLocomotionClip])
 
   useFrame((_state, delta) => {
-    // ── Crossfade idle <-> walk on movement-state change ──────────────────
+    // ── Crossfade between idle/walk/stair-jump on state change ────────────
     // Skipped entirely while a one-shot interaction animation owns the mixer.
     if (!animationLockRef.current) {
-      const isMoving = movingRef.current
-      if (isMoving !== wasMoving.current) {
-        actions[wasMoving.current ? WALK_CLIP : IDLE_CLIP]?.fadeOut(CROSSFADE_DURATION)
-        actions[isMoving ? WALK_CLIP : IDLE_CLIP]?.reset().fadeIn(CROSSFADE_DURATION).play()
-        wasMoving.current = isMoving
+      const targetClip = resolveLocomotionClip()
+      if (targetClip !== currentClipRef.current) {
+        actions[currentClipRef.current]?.fadeOut(CROSSFADE_DURATION)
+        actions[targetClip]?.reset().fadeIn(CROSSFADE_DURATION).play()
+        currentClipRef.current = targetClip
       }
     }
 
@@ -172,21 +171,11 @@ export function AnimatedCat({
     const step   = Math.min(1, ROTATION_LERP * delta * 60)
     facingYaw.current += shortestYawDelta(facingYaw.current, target) * step
     groupRef.current.rotation.y = facingYaw.current
-
-    // ── Stair-descent body pitch ────────────────────────────────────────────
-    // stairBlendRef is already smoothed upstream (shared with the camera's
-    // stair-descent offsets in App.tsx), so this only needs to scale by it —
-    // no separate easing here, which keeps the two in lockstep and avoids
-    // any snap of its own. Applied to pitchGroupRef (child of the yawed
-    // group), not groupRef itself — see the comment on pitchGroupRef above.
-    pitchGroupRef.current.rotation.x = CAT_STAIR_PITCH * stairBlendRef.current
   })
 
   return (
     <group ref={groupRef} position={[0, CAT_Y_OFFSET, 0]} scale={CAT_SCALE}>
-      <group ref={pitchGroupRef}>
-        <primitive object={scene} />
-      </group>
+      <primitive object={scene} />
     </group>
   )
 }
