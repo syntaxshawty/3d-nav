@@ -12,6 +12,7 @@ import {
 import { isInsideHouseFootprint } from '../data/houseGeometry';
 import { SPAWN_POS, SPAWN_YAW } from '../data/spawn';
 import { shortestYawDelta } from '../mathUtils';
+import type { PlayerController } from './playerController';
 
 const SPEED = 5;
 const TURN_SPEED = 2.5;
@@ -41,15 +42,7 @@ function smoothstep(t: number) {
 // Exposes the refs useFollowCamera, useProximity, and AnimatedCat read.
 export function usePlayerController(
   movement: MutableRefObject<Movement>,
-  stairActionRef: MutableRefObject<(direction: 'down' | 'up') => void>,
-  transitioningRef: MutableRefObject<boolean>,
-  // freeze movement during cat animation
-  animationLockRef: MutableRefObject<boolean>,
-  // freeze movement while focus mode (the fog/text overlay) is open — kept
-  // separate from animationLockRef since the two can be active at once (an
-  // object with both `animation` and a focus overlay) and are cleared
-  // independently, on their own unrelated timers.
-  movementLockRef: MutableRefObject<boolean>,
+  playerRef: MutableRefObject<PlayerController>,
 ) {
   const groupRef = useRef<Group>(null!);
   const yawRef = useRef(SPAWN_YAW);
@@ -64,8 +57,9 @@ export function usePlayerController(
   // from walking off the deck's edge into open air.
   const onDeck = useRef(true);
 
-  // Scripted stair transition — see stairActionRef below. While active, this
-  // replaces WASD-driven movement/rotation entirely for STAIR_TRANSITION_DURATION.
+  // Scripted stair transition — see playerRef.current.useStairs below. While
+  // active, this replaces WASD-driven movement/rotation entirely for
+  // STAIR_TRANSITION_DURATION.
   const scripted = useRef(false);
   const scriptDirection = useRef<'down' | 'up'>('down');
   const scriptFrom = useRef(new Vector3());
@@ -85,7 +79,7 @@ export function usePlayerController(
   // Write the stair-transition trigger into the ref so GardenView's E-key
   // handler can start it from outside this component.
   useEffect(() => {
-    stairActionRef.current = (direction) => {
+    playerRef.current.useStairs = (direction) => {
       if (scripted.current) return;
       scriptDirection.current = direction;
       scriptFrom.current.copy(groupRef.current.position);
@@ -110,7 +104,7 @@ export function usePlayerController(
       scriptElapsed.current = 0;
       scripted.current = true;
     };
-  }, [stairActionRef]);
+  }, [playerRef]);
 
   useFrame((_state, delta) => {
     const pos = groupRef.current.position;
@@ -136,7 +130,7 @@ export function usePlayerController(
         -Math.cos(yawRef.current),
       );
       if (t >= 1) scripted.current = false;
-    } else if (!animationLockRef.current && !movementLockRef.current) {
+    } else if (!playerRef.current.animationLock && !playerRef.current.movementLock) {
       // ── Rotation ────────────────────────────────────────────────────────
       // Note: this group's own rotation is intentionally never set from yaw
       // — yawRef alone drives the camera and movement math, and AnimatedCat
@@ -225,7 +219,7 @@ export function usePlayerController(
     const stairK = 1 - Math.exp(-delta / STAIR_BLEND_TIME);
     stairBlendRef.current += (stairTarget - stairBlendRef.current) * stairK;
 
-    transitioningRef.current = scripted.current || animationLockRef.current;
+    playerRef.current.transitioning = scripted.current || playerRef.current.animationLock;
   });
 
   const reset = useCallback(() => {

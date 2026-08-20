@@ -35,8 +35,9 @@ export interface InteractiveObjectData {
   action?: 'descend-stairs' | 'ascend-stairs';
   // If set, E also plays this clip name (from cat_animated.glb) once on the
   // player's avatar, alongside the normal info overlay — see AnimatedCat.tsx.
-  // Movement locks for the clip's duration (same transitioningRef the stair
-  // transition uses), so unlike `action` this doesn't replace the overlay.
+  // Movement locks for the clip's duration (same playerRef.transitioning
+  // the stair transition uses), so unlike `action` this doesn't replace
+  // the overlay.
   animation?: string;
   visual: {
     kind: string; // determines which geometry to render: 'none' | 'flower' | 'bench' | 'image' | ...

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import { RepeatWrapping, SRGBColorSpace } from 'three'
 import type { Movement } from './systems/useInput'
+import type { PlayerController } from './systems/playerController'
 import { usePlayerController } from './systems/usePlayerController'
 import { useFollowCamera } from './systems/useFollowCamera'
 import { useProximity } from './systems/useProximity'
@@ -54,43 +55,33 @@ useTexture.preload('/textures/grass_ground.webp')
 function Player({
   movement,
   nearbyObjectRef,
-  resetRef,
-  stairActionRef,
-  transitioningRef,
-  playAnimationRef,
-  animationLockRef,
-  movementLockRef,
+  playerRef,
 }: {
-  movement:         MutableRefObject<Movement>
-  nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
-  resetRef:         MutableRefObject<() => void>
-  stairActionRef:   MutableRefObject<(direction: 'down' | 'up') => void>
-  transitioningRef: MutableRefObject<boolean>
-  playAnimationRef: MutableRefObject<(clip: string) => void>
-  animationLockRef: MutableRefObject<boolean>
-  movementLockRef:  MutableRefObject<boolean>
+  movement:        MutableRefObject<Movement>
+  nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>
+  playerRef:       MutableRefObject<PlayerController>
 }) {
   const {
     groupRef, yawRef, movingRef, stairBlendRef, fwdRef, stairOrbitTRef, stairActiveRef,
     reset: resetPlayer,
-  } = usePlayerController(movement, stairActionRef, transitioningRef, animationLockRef, movementLockRef)
+  } = usePlayerController(movement, playerRef)
   const { camPosRef, driftActiveRef, reset: resetCamera } = useFollowCamera(
     groupRef, yawRef, fwdRef, stairBlendRef, stairOrbitTRef,
-    movement, transitioningRef,
+    movement, playerRef,
   )
-  const { closestDistRef } = useProximity(groupRef, nearbyObjectRef, transitioningRef, movementLockRef)
+  const { closestDistRef } = useProximity(groupRef, nearbyObjectRef, playerRef)
 
-  // Write the reset function into the ref so GardenView can call it from a
-  // button. Composes each system's own reset — every system owns resetting
-  // exactly the state it owns. Runs once after mount; resetPlayer/
+  // Write the reset function into playerRef so GardenView can call it from
+  // a button. Composes each system's own reset — every system owns
+  // resetting exactly the state it owns. Runs once after mount; resetPlayer/
   // resetCamera are stable (useCallback with no deps, closing only over
   // stable refs), so this never needs to re-run.
   useEffect(() => {
-    resetRef.current = () => {
+    playerRef.current.reset = () => {
       resetPlayer()
       resetCamera()
     }
-  }, [resetRef, resetPlayer, resetCamera])
+  }, [playerRef, resetPlayer, resetCamera])
 
   // ── Debug overlay ──────────────────────────────────────────────────────
   // Dev-only: this element only exists in the DOM at all when
@@ -128,8 +119,7 @@ function Player({
         yawRef={yawRef}
         movingRef={movingRef}
         stairActiveRef={stairActiveRef}
-        playAnimationRef={playAnimationRef}
-        animationLockRef={animationLockRef}
+        playerRef={playerRef}
       />
     </group>
   )
@@ -138,23 +128,13 @@ function Player({
 export function Scene({
   movement,
   nearbyObjectRef,
-  resetRef,
-  stairActionRef,
-  transitioningRef,
-  playAnimationRef,
-  animationLockRef,
-  movementLockRef,
+  playerRef,
   fogActive,
 }: {
-  movement:         MutableRefObject<Movement>
-  nearbyObjectRef:  MutableRefObject<InteractiveObjectData | null>
-  resetRef:         MutableRefObject<() => void>
-  stairActionRef:   MutableRefObject<(direction: 'down' | 'up') => void>
-  transitioningRef: MutableRefObject<boolean>
-  playAnimationRef: MutableRefObject<(clip: string) => void>
-  animationLockRef: MutableRefObject<boolean>
-  movementLockRef:  MutableRefObject<boolean>
-  fogActive:      boolean
+  movement:        MutableRefObject<Movement>
+  nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>
+  playerRef:       MutableRefObject<PlayerController>
+  fogActive:       boolean
 }) {
   return (
     <>
@@ -176,12 +156,7 @@ export function Scene({
       <Player
         movement={movement}
         nearbyObjectRef={nearbyObjectRef}
-        resetRef={resetRef}
-        stairActionRef={stairActionRef}
-        transitioningRef={transitioningRef}
-        playAnimationRef={playAnimationRef}
-        animationLockRef={animationLockRef}
-        movementLockRef={movementLockRef}
+        playerRef={playerRef}
       />
       {interactiveObjects.map(obj => (
         <InteractiveObject key={obj.id} data={obj} />

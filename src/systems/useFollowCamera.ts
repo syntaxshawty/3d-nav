@@ -7,6 +7,7 @@ import {
   CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_TARGET_OFFSET,
   SPAWN_CAM_POS, SPAWN_LOOK_TARGET,
 } from '../data/spawn'
+import type { PlayerController } from './playerController'
 
 const CAMERA_PITCH = 0.03  // default downward tilt (radians) when the player isn't looking around — kept minimal since the raised target already angles the view down toward the avatar
 
@@ -48,7 +49,7 @@ export function useFollowCamera(
   stairBlendRef: MutableRefObject<number>,
   stairOrbitTRef: MutableRefObject<number>,
   movement: MutableRefObject<Movement>,
-  transitioningRef: MutableRefObject<boolean>,
+  playerRef: MutableRefObject<PlayerController>,
 ) {
   const pitch = useMouseLook(CAMERA_PITCH, PITCH_MIN, PITCH_MAX, MOUSE_LOOK_SENSITIVITY)
 
@@ -66,7 +67,7 @@ export function useFollowCamera(
     // Recomputed the same way usePlayerController derives its own isMoving
     // (not scripted, and some WASD key held) — deterministic from the same
     // inputs, so this stays in sync without needing an extra shared ref.
-    const isMoving = !transitioningRef.current && (m.forward || m.backward || m.left || m.right)
+    const isMoving = !playerRef.current.transitioning && (m.forward || m.backward || m.left || m.right)
 
     // ── Idle timer ─────────────────────────────────────────────────────────
     if (isMoving) {

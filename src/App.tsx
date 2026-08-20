@@ -31,17 +31,15 @@ const FOCUS_SCENE_FILTER = 'blur(4px) saturate(0.4) brightness(0.75)'
 function GardenView() {
   const movement       = useInput()
   const nearbyObjectRef = useRef<InteractiveObjectData | null>(null)
-  const playerReset     = useRef<() => void>(() => {})
-  const stairAction     = useRef<(direction: 'down' | 'up') => void>(() => {})
-  const transitioning   = useRef(false)
-  const playAnimation   = useRef<(clip: string) => void>(() => {})
-  const animationLock   = useRef(false)
-  // Freezes WASD movement/turning for as long as focus mode is open — set
-  // the instant E/Enter is pressed (not waiting on the fog/content fade), so
-  // there's no window where the player can wander off mid-interaction, and
-  // cleared the instant it closes so control comes back immediately rather
-  // than waiting out the closing fade.
-  const movementLock    = useRef(false)
+  // Groups every player-owned control (reset/useStairs/playAnimation
+  // actions, transitioning/animationLock/movementLock state) behind one
+  // ref instead of six separate ones — see playerController.ts.
+  // movementLock specifically freezes WASD movement/turning for as long as
+  // focus mode is open — set the instant E/Enter is pressed (not waiting
+  // on the fog/content fade), so there's no window where the player can
+  // wander off mid-interaction, and cleared the instant it closes so
+  // control comes back immediately rather than waiting out the closing fade.
+  const playerRef = useRef(createPlayerController())
 
   const [activeObject, setActiveObject] = useState<InteractiveObjectData | null>(null)
   // Drives the fog (scene fog + canvas blur + fog gradient) — the first
@@ -59,7 +57,7 @@ function GardenView() {
   const [showHint, setShowHint] = useState(true)
 
   useEffect(() => {
-    movementLock.current = !!activeObject
+    playerRef.current.movementLock = !!activeObject
   }, [activeObject])
 
   useEffect(() => {
@@ -96,11 +94,11 @@ function GardenView() {
         setActiveObject(null)
         return
       }
-      if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || transitioning.current) return
+      if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || playerRef.current.transitioning) return
       const obj = nearbyObjectRef.current
-      if (obj.animation) playAnimation.current(obj.animation)
-      if (obj.action === 'descend-stairs')      stairAction.current('down')
-      else if (obj.action === 'ascend-stairs')  stairAction.current('up')
+      if (obj.animation) playerRef.current.playAnimation(obj.animation)
+      if (obj.action === 'descend-stairs')      playerRef.current.useStairs('down')
+      else if (obj.action === 'ascend-stairs')  playerRef.current.useStairs('up')
       else                                       setActiveObject(obj)
     }
     window.addEventListener('keydown', onKey)
@@ -130,7 +128,7 @@ function GardenView() {
           (tabIndex -1) so it can't retain keyboard focus after a click —
           otherwise a focused button intercepts the next Enter keypress as a
           native click, resetting position instead of opening focus mode. */}
-      <button className="reset-button" tabIndex={-1} onClick={() => playerReset.current()}>
+      <button className="reset-button" tabIndex={-1} onClick={() => playerRef.current.reset()}>
         take me home
       </button>
 
@@ -219,12 +217,7 @@ function GardenView() {
               <Scene
                 movement={movement}
                 nearbyObjectRef={nearbyObjectRef}
-                resetRef={playerReset}
-                stairActionRef={stairAction}
-                transitioningRef={transitioning}
-                playAnimationRef={playAnimation}
-                animationLockRef={animationLock}
-                movementLockRef={movementLock}
+                playerRef={playerRef}
                 fogActive={fogVisible}
               />
             </Physics>

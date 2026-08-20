@@ -2,6 +2,7 @@ import { useRef, type MutableRefObject, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, type Group } from 'three'
 import { interactiveObjects, type InteractiveObjectData } from '../data/interactiveObjects'
+import type { PlayerController } from './playerController'
 
 // Pre-computed once at module load — useFrame reads these without allocating per frame.
 // Stays in sync with interactiveObjects because it maps the same array.
@@ -13,8 +14,7 @@ const OBJECT_POSITIONS = interactiveObjects.map(o => new Vector3(...o.position))
 export function useProximity(
   groupRef: RefObject<Group>,
   nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>,
-  transitioningRef: MutableRefObject<boolean>,
-  movementLockRef: MutableRefObject<boolean>,
+  playerRef: MutableRefObject<PlayerController>,
 ) {
   // Exposed only for the dev debug overlay.
   const closestDistRef = useRef(Infinity)
@@ -40,10 +40,10 @@ export function useProximity(
     // whole hint as a unit instead of the key glyph popping in and out.
     // Hidden during the scripted stair transition itself so it doesn't flash
     // "Enter" again mid-animation, on approach to the opposite end's
-    // trigger, and hidden while the overlay is open (movementLockRef).
+    // trigger, and hidden while the overlay is open (playerRef.movementLock).
     const promptEl = document.getElementById('prompt')
     if (promptEl) {
-      if (found && !transitioningRef.current && !movementLockRef.current) {
+      if (found && !playerRef.current.transitioning && !playerRef.current.movementLock) {
         const captionEl = document.getElementById('prompt-caption')
         if (captionEl) captionEl.textContent = found.prompt
         promptEl.style.opacity = '1'

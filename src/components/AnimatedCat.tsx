@@ -8,6 +8,7 @@ import {
 } from 'three'
 import { shortestYawDelta } from '../mathUtils'
 import { PLANK_THICKNESS } from '../data/deckGeometry'
+import type { PlayerController } from '../systems/playerController'
 
 // The player's visible model — an animated cat, replacing the earlier
 // procedural bunny. Sourced from a large general-purpose quadruped
@@ -39,7 +40,7 @@ const CAT_FACING_YAW = Math.PI   // rest pose faces +Z (toward the camera); this
 const ROTATION_LERP = 0.15   // fraction of the remaining turn closed per ~frame at 60fps
 
 export function AnimatedCat({
-  yawRef, movingRef, stairActiveRef, playAnimationRef, animationLockRef,
+  yawRef, movingRef, stairActiveRef, playerRef,
 }: {
   yawRef:        MutableRefObject<number>
   movingRef:     MutableRefObject<boolean>
@@ -47,14 +48,14 @@ export function AnimatedCat({
   // takes priority over movingRef so JumpFw_IP plays instead of the normal
   // walk cycle while it's carrying the player up/down.
   stairActiveRef: MutableRefObject<boolean>
-  // Written here so GardenView's E-key handler can play a one-shot clip
-  // (e.g. SharpenClaws_Vert) from outside this component — same pattern as
-  // usePlayerController's stairActionRef.
-  playAnimationRef: MutableRefObject<(clip: string) => void>
-  // Set true for the one-shot's duration; usePlayerController reads it to
-  // freeze WASD movement/rotation meanwhile, so it's owned jointly with
-  // this component rather than being purely local state here.
-  animationLockRef: MutableRefObject<boolean>
+  // playerRef.current.playAnimation is written here so GardenView's E-key
+  // handler can play a one-shot clip (e.g. SharpenClaws_Vert) from outside
+  // this component — same pattern as usePlayerController's useStairs.
+  // playerRef.current.animationLock is set true for the one-shot's
+  // duration; usePlayerController reads it to freeze WASD movement/
+  // rotation meanwhile, so it's owned jointly with this component rather
+  // than being purely local state here.
+  playerRef: MutableRefObject<PlayerController>
 }) {
   const groupRef = useRef<Group>(null!)
   const { scene, animations } = useGLTF(CAT_URL)
@@ -126,15 +127,15 @@ export function AnimatedCat({
 
   // One-shot interaction animations (e.g. SharpenClaws_Vert) — plays a clip
   // once over the current locomotion state, then hands back to it. Ignored
-  // while one is already playing (animationLockRef.current) or if the clip
-  // name doesn't exist in this asset, rather than restarting/crashing.
+  // while one is already playing (playerRef.current.animationLock) or if
+  // the clip name doesn't exist in this asset, rather than restarting/crashing.
   useEffect(() => {
-    playAnimationRef.current = (clip: string) => {
-      if (animationLockRef.current) return
+    playerRef.current.playAnimation = (clip: string) => {
+      if (playerRef.current.animationLock) return
       const action = actions[clip]
       if (!action) return
 
-      animationLockRef.current = true
+      playerRef.current.animationLock = true
       actions[currentClipRef.current]?.fadeOut(CROSSFADE_DURATION)
       action.reset()
       action.setLoop(LoopOnce, 1)
@@ -145,19 +146,19 @@ export function AnimatedCat({
       const onFinished = (event: { action: AnimationAction }) => {
         if (event.action !== action) return
         mixer.removeEventListener('finished', onFinished)
-        animationLockRef.current = false
+        playerRef.current.animationLock = false
         const resumeClip = resolveLocomotionClip()
         actions[resumeClip]?.reset().fadeIn(CROSSFADE_DURATION).play()
         currentClipRef.current = resumeClip
       }
       mixer.addEventListener('finished', onFinished)
     }
-  }, [actions, playAnimationRef, animationLockRef, resolveLocomotionClip])
+  }, [actions, playerRef, resolveLocomotionClip])
 
   useFrame((_state, delta) => {
     // ── Crossfade between idle/walk/stair-jump on state change ────────────
     // Skipped entirely while a one-shot interaction animation owns the mixer.
-    if (!animationLockRef.current) {
+    if (!playerRef.current.animationLock) {
       const targetClip = resolveLocomotionClip()
       if (targetClip !== currentClipRef.current) {
         actions[currentClipRef.current]?.fadeOut(CROSSFADE_DURATION)
