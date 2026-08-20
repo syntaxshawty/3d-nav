@@ -1,0 +1,51 @@
+/* ── strawberry-style layout ──────────────────────────────────────────────
+   Three elements: the gif, the model viewer overlapping its corner, and a
+   plain description paragraph beneath (see FocusLayoutStrawberry.tsx — no
+   title/link, unlike the other layouts). The viewer's own look (shadow,
+   size) lives in ObjectViewer.tsx itself — this file only decides where it
+   sits relative to the gif. */
+.focus-strawberry-visual {
+  position: relative;
+  width: 100%;
+  right: 5%;
+  top: 10%;
+}
+
+.focus-strawberry-gif {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  filter:
+    drop-shadow(0 22px 28px rgba(0, 0, 0, 0.5))
+    drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+
+/* Negative top/right pushes it past the gif's own edges, so it reads as
+   overlapping the corner rather than sitting inside the frame. */
+.focus-strawberry-viewer {
+  position: absolute;
+  top: 5%;
+  right: -15%;
+}
+
+.focus-strawberry-description {
+  position: absolute;
+  bottom: 10%;
+  left: -15%;
+  font-family: 'Freckle Face', system-ui;
+  font-size: 1.5rem;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 6px 18px rgba(0, 0, 0, 0.45);
+  z-index: 333;
+  width: 45%;
+  text-align: center;
+}
+
+.focus-strawberry-layout {
+  display: absolute;
+  gap: 2rem;
+  width: 40vw;
+  margin-left: auto;
+  margin-right: 5vw;
+}
