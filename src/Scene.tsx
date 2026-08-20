@@ -7,8 +7,7 @@ import type { PlayerController } from './systems/playerController'
 import { usePlayerController } from './systems/usePlayerController'
 import { useFollowCamera } from './systems/useFollowCamera'
 import { useProximity } from './systems/useProximity'
-import { interactiveObjects, type InteractiveObjectData } from './data/interactiveObjects'
-import { InteractiveObject } from './components/InteractiveObject'
+import { type InteractiveObjectData } from './data/interactiveObjects'
 import { Deck } from './environment/Deck'
 import { House } from './environment/House'
 import { SPAWN_POS } from './data/spawn'
@@ -158,9 +157,6 @@ export function Scene({
         nearbyObjectRef={nearbyObjectRef}
         playerRef={playerRef}
       />
-      {interactiveObjects.map(obj => (
-        <InteractiveObject key={obj.id} data={obj} />
-      ))}
       <Deck />
       <House />
       <PineForest />
