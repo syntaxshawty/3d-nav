@@ -24,12 +24,22 @@ export function useProximity(
 
     // Single loop over all objects so "nearest in range" is unambiguous.
     // Each object declares its own interactionRadius in the data file.
+    // closestDist tracks distance to the nearest object overall (any
+    // distance, for the debug overlay); closestEligibleDist is the
+    // separate running minimum among objects the player is actually
+    // inside the interactionRadius of — that's what picks `found`, so two
+    // overlapping radii resolve to whichever is truly closer, not
+    // whichever happens to come first in the array.
     let found: InteractiveObjectData | null = null
     let closestDist = Infinity
+    let closestEligibleDist = Infinity
     for (let i = 0; i < interactiveObjects.length; i++) {
       const d = pos.distanceTo(OBJECT_POSITIONS[i])
       if (d < closestDist) closestDist = d
-      if (d < interactiveObjects[i].interactionRadius && !found) found = interactiveObjects[i]
+      if (d < interactiveObjects[i].interactionRadius && d < closestEligibleDist) {
+        found = interactiveObjects[i]
+        closestEligibleDist = d
+      }
     }
     nearbyObjectRef.current = found
     closestDistRef.current  = closestDist
