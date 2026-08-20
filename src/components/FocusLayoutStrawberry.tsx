@@ -1,4 +1,4 @@
-import { type InteractiveObjectData } from '../data/interactiveObjects';
+import { type StrawberryStyleContent } from '../data/interactiveObjects';
 import { CONTENT_FADE_DURATION } from '../data/focusTiming';
 import { ObjectViewer } from './ObjectViewer';
 import './FocusLayoutStrawberry.css';
@@ -10,12 +10,14 @@ import './FocusLayoutStrawberry.css';
 // not a variant of the other three. Reuses .focus-layout for the shared
 // column shape (flex-direction/gap/right-anchoring) but sets its own width
 // inline, directly at the point of use, rather than an override modifier
-// class for the one property that differs.
+// class for the one property that differs. overlayImage/viewerModel are
+// both required on StrawberryStyleContent (they're this layout's two
+// primary elements), so no presence checks are needed before rendering them.
 export function FocusLayoutStrawberry({
   focusObject,
   visible,
 }: {
-  focusObject: InteractiveObjectData;
+  focusObject: StrawberryStyleContent;
   visible: boolean;
 }) {
   return (
@@ -29,21 +31,17 @@ export function FocusLayoutStrawberry({
       }}
     >
       <div className="focus-strawberry-visual">
-        {focusObject.overlayImage && (
-          <video
-            className="focus-strawberry-gif"
-            src={focusObject.overlayImage}
-            autoPlay
-            loop
-            muted
-            playsInline
-          />
-        )}
-        {focusObject.viewerModel && (
-          <div className="focus-strawberry-viewer">
-            <ObjectViewer model={focusObject.viewerModel} />
-          </div>
-        )}
+        <video
+          className="focus-strawberry-gif"
+          src={focusObject.overlayImage}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+        <div className="focus-strawberry-viewer">
+          <ObjectViewer model={focusObject.viewerModel} />
+        </div>
       </div>
 
       <p className="focus-strawberry-description">{focusObject.description}</p>

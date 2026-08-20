@@ -18,9 +18,8 @@ export type Position = Vector3Tuple;
 
 // Shared by every interactive object regardless of what happens on
 // interact — proximity detection (position/interactionRadius), the prompt
-// caption, in-world rendering (visual), and animation (see the note on
-// InteractiveActionTrigger.action below for why animation lives here and
-// not on InteractiveContentObject alone).
+// caption, and animation (see the note on InteractiveActionTrigger.action
+// below for why animation lives here and not only on content objects).
 interface InteractiveObjectBase {
   id: string;
   position: Position;
@@ -28,18 +27,12 @@ interface InteractiveObjectBase {
   prompt: string; // caption shown next to the Enter-key glyph in the proximity prompt (e.g. "to inspect")
   // If set, E plays this clip name (from cat_animated.glb) once on the
   // player's avatar — see AnimatedCat.tsx. Kept on the shared base, not
-  // InteractiveContentObject alone, because App.tsx's E-key handler checks
-  // this unconditionally, before it looks at `action` — so an action
-  // trigger and an animation can already coexist on one object today, even
-  // though no current entry does both. (Animation/effect modeling as its
-  // own concern is a separate, later change — not part of this split.)
+  // content objects alone, because App.tsx's E-key handler checks this
+  // unconditionally, before it looks at `action` — so an action trigger
+  // and an animation can already coexist on one object today, even though
+  // no current entry does both. (Animation/effect modeling as its own
+  // concern is a separate, later change — not part of this split.)
   animation?: string;
-  visual: {
-    kind: string; // determines which geometry to render: 'none' | 'flower' | 'bench' | 'image' | ...
-    color?: string; // primary color passed to the visual
-    image?: string; // texture path — required when kind === 'image'; rendered as a camera-facing photo instead of geometry (e.g. for something that's no longer actually there)
-    imageScale?: number; // width in world units of the image billboard (defaults to 1.5)
-  };
 }
 
 // A scripted world action (currently just the two stair triggers) — E
@@ -51,32 +44,48 @@ export interface InteractiveActionTrigger extends InteractiveObjectBase {
   action: 'descend-stairs' | 'ascend-stairs';
 }
 
-// Everything that opens the info overlay on interact. `action` is always
-// undefined here (vs. a required literal on InteractiveActionTrigger) —
-// that's the discriminant App.tsx's E-key handler already narrows on.
-export interface InteractiveContentObject extends InteractiveObjectBase {
+// Fields required by every content object regardless of layout. `action`
+// is always undefined here (vs. a required literal on
+// InteractiveActionTrigger) — that's the discriminant App.tsx's E-key
+// handler narrows on to tell an action trigger from a content object.
+export interface InteractiveContentBase extends InteractiveObjectBase {
   action?: undefined;
   title: string;
   description: string;
-  href?: string; // optional internal route for a full page
-  linkLabel?: string; // button label for href (defaults to "Read more")
-  viewerModel?: string; // GLB path — a reusable primitive (see ObjectViewer.tsx); currently used by 'strawberry-style', available to any future bespoke layout
-  overlayImage?: string; // photo/gif path — shown when layout is 'image-row', 'newspaper-style', or 'strawberry-style' (main visual differs per layout — see the FocusLayout* components)
-  overlayImageGallery?: string[]; // additional photo paths — shown alongside overlayImage, same inline row, when layout is 'image-row'
-  // Where the readable text pocket sits over the photo, when layout is
-  // 'newspaper-style' — CSS top/left values, positioned absolute within
-  // the photo's own box (so it tracks a spot on the page, e.g. blank ad
-  // space, regardless of viewport size). Per-object because that spot is
-  // different in every scanned photo; falls back to .focus-newspaper-text's
-  // default position if omitted.
-  newspaperTextPosition?: { top: string; left: string };
-  // Which overlay treatment to render for this object — see the switch in
-  // App.tsx. Each object is meant to get its own bespoke layout eventually
-  // (see 'newspaper-style'/'strawberry-style' as the model to follow);
-  // 'image-row' is the interim catch-all for everything that hasn't been
-  // given one yet, not a "default" to keep reusing long-term.
-  layout: 'image-row' | 'newspaper-style' | 'strawberry-style';
 }
+
+// One interface per layout, each owning only the presentation fields that
+// layout actually renders (see the matching FocusLayout* component) —
+// `layout` doubles as the discriminant between these three. Each object is
+// meant to get its own bespoke layout eventually (see 'newspaper-style'/
+// 'strawberry-style' as the model to follow); 'image-row' is the interim
+// catch-all for everything that hasn't been given one yet, not a "default"
+// to keep reusing long-term.
+
+export interface ImageRowContent extends InteractiveContentBase {
+  layout: 'image-row';
+  overlayImage?: string; // photo path — shown above the title/description if set
+  overlayImageGallery?: string[]; // additional photos, shown alongside overlayImage in the same inline row
+}
+
+export interface NewspaperStyleContent extends InteractiveContentBase {
+  layout: 'newspaper-style';
+  overlayImage: string; // the scanned photo itself — the layout's primary element, so always required
+  // Where the readable text pocket sits over the photo — CSS top/left
+  // values, positioned absolute within the photo's own box (so it tracks
+  // a spot on the page, e.g. blank ad space, regardless of viewport
+  // size). Per-object because that spot is different in every scanned
+  // photo; falls back to .focus-newspaper-text's default position if omitted.
+  newspaperTextPosition?: { top: string; left: string };
+}
+
+export interface StrawberryStyleContent extends InteractiveContentBase {
+  layout: 'strawberry-style';
+  overlayImage: string; // looping gif/video — required, it's one of the layout's two primary elements
+  viewerModel: string; // GLB path for the spinnable 3D preview (see ObjectViewer.tsx) — required, the layout's other primary element
+}
+
+export type InteractiveContentObject = ImageRowContent | NewspaperStyleContent | StrawberryStyleContent;
 
 export type InteractiveObjectData = InteractiveActionTrigger | InteractiveContentObject;
 
@@ -86,8 +95,18 @@ export const STRAWBERRY_POT_POSITION: Position = [20, DECK_TOP_Y, -10];
 
 // Shared with plants.ts so the real lemon-tree model (rendered there) and
 // this proximity/interaction entry always agree on where the tree is —
-// same pattern as STRAWBERRY_POT_POSITION above.
+// same pattern as STRAWBERRY_POT_POSITION above. Only for rendering the
+// GLB now — see LEMON_TREE_TRIGGER_POSITION below for the interaction area.
 export const LEMON_TREE_POSITION: Position = [5, 0, -7];
+
+// Separate from LEMON_TREE_POSITION on purpose — same reasoning as
+// BACK_DOORS_POSITION below: the model's own anchor covers the whole
+// tree's footprint (trunk + canopy spread), but the interaction area
+// should only cover the trunk/base where a player would actually stand,
+// not wherever the wide canopy happens to reach. Starts equal to
+// LEMON_TREE_POSITION; nudge independently once you can see the trigger
+// circle relative to the canopy in-browser.
+export const LEMON_TREE_TRIGGER_POSITION: Position = [2, 0, -5];
 
 // Same sharing pattern as LEMON_TREE_POSITION — one constant per real GLB
 // prop in plants.ts, imported by both files so the visual and the
@@ -130,30 +149,31 @@ export const interactiveObjects: InteractiveObjectData[] = [
     id: 'strawberry-pot',
     title: 'Strawberry Pot',
     description:
-      'The terra cotta pot lasted far longer than the berries ever did. We grew strawberries in the front yard too, next to the baby pine tree I planted which was later cut down (</3) because it grew so big and strong that its roots started cracking and lifting the concrete walkway to the house... ',
+      'The terra cotta pot lasted far longer than the berries ever did. We grew strawberries in the front yard too, next to the baby pine tree I planted which was later cut down because it grew so big and strong that its roots started cracking and lifting the concrete walkway to the house... (</3)',
     position: STRAWBERRY_POT_POSITION,
     interactionRadius: 2.5,
     prompt: 'to inspect',
+    layout: 'strawberry-style',
     viewerModel: '/models/strawberry.glb',
-    // 'none': the pot itself is already rendered by Backyard.tsx (as the real
-    // GLB prop) — this entry only adds proximity detection and the popup.
-    visual: { kind: 'none' },
+    overlayImage: '/photos/tree-growth-death.webm',
+    // The pot itself is already rendered by Backyard.tsx (as the real GLB
+    // prop) — this entry only adds proximity detection and the popup.
   },
   {
     // TODO: template entry — fill in title/description/prompt once there's
-    // real copy for this one; interactionRadius/visual are reasonable
-    // defaults for a real GLB prop (mirrors strawberry-pot's shape).
+    // real copy for this one; interactionRadius is a reasonable default
+    // for a real GLB prop (mirrors strawberry-pot's shape).
     id: 'lemon-tree',
     title: 'Lemon Tree',
     description:
       'We had two lemon trees but only one stands now. One tree was home to a bluejay for some years. He would land on my head and eat peanuts out of my hand. The Meyer lemon tree drew stealthy neighbors into the backyard, its fruit traveled thousands of miles every year as gifts for grandmas and produced countless jugs of perfectly refreshing lemonade. ',
-    position: LEMON_TREE_POSITION,
-    interactionRadius: 3,
+    position: LEMON_TREE_TRIGGER_POSITION,
+    interactionRadius: 1.5,
     prompt: 'to inspect',
-    // 'none': the tree itself is already rendered by Backyard.tsx via
-    // plants.ts (as the real GLB prop) — this entry only adds proximity
-    // detection and the popup.
-    visual: { kind: 'none' },
+    layout: 'image-row',
+    // The tree itself is already rendered by Backyard.tsx via plants.ts
+    // (as the real GLB prop) — this entry only adds proximity detection
+    // and the popup.
   },
   {
     // TODO: template entry — fill in title/description/prompt.
@@ -164,8 +184,8 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: PLUM_TREE_POSITION,
     interactionRadius: 2.5,
     prompt: 'to inspect',
-    // 'none': already rendered by Backyard.tsx via plants.ts.
-    visual: { kind: 'none' },
+    layout: 'image-row',
+    // Already rendered by Backyard.tsx via plants.ts.
   },
   {
     // TODO: template entry — fill in title/description/prompt.
@@ -176,7 +196,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: GARDEN_SHED_POSITION,
     interactionRadius: 3,
     prompt: 'to inspect',
-    visual: { kind: 'none' },
+    layout: 'image-row',
   },
   {
     // TODO: template entry — fill in title/description/prompt.
@@ -187,19 +207,19 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: YARD_TREE_POSITION,
     interactionRadius: 2.5,
     prompt: 'to inspect',
+    layout: 'image-row',
     animation: 'SharpenClaws_Vert',
-    visual: { kind: 'none' },
   },
   {
     // TODO: template entry — fill in title/description/prompt.
     id: 'bougainvillea',
     title: 'Bougainvillea',
     description:
-      'The most vibrant color, an explosion of papery petals, such an unnatural hue. This vine would grow largely untamed, for years, until it would begin to fall and encroach upon the walkway on the side of the house used by occasionally by us and, more often, local deer. Dad used wire and screws to train it against the fence, but no more than necessary. ',
+      'An explosion of papery petals of such an unnatural hue. This vine would grow and grow, untamed, for years; a seemingly endless bounty of flowers pouring from its arms... and then falling to the ground, leaving a beautiful fuschia carpet. Eventually, the vine would begin to fall, encroaching upon the walkway to the side of the house which was used by occasionally by us, but, more often frequented by local deer. Once neccessary, Dad used wire and screws to train the plant against the fence. On the other side of the house, through the carpetted walkway, were real Fuschia plants (which I just now learned is the origin of the color fuschia... I have always called them ballerina flowers...) ',
     position: BOUGAINVILLEA_POSITION,
     interactionRadius: 2.5,
     prompt: 'to inspect',
-    visual: { kind: 'none' },
+    layout: 'image-row',
   },
   {
     // TODO: template entry — fill in title/description/prompt. Wider radius
@@ -212,7 +232,7 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: NASTURTIUM_POSITION,
     interactionRadius: 4,
     prompt: 'to inspect',
-    visual: { kind: 'none' },
+    layout: 'image-row',
   },
   {
     // TODO: template entry — fill in title/description/prompt. Wider radius
@@ -233,18 +253,26 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: BLACKBERRY_POSITION,
     interactionRadius: 2,
     prompt: 'to inspect',
-    visual: { kind: 'none' },
+    layout: 'image-row',
   },
   {
     // TODO: template entry — fill in title/description/prompt.
     id: 'deck-chair',
     title: 'Deck Chair',
     description:
-      'An ideal spot to enjoy a chocolate old fashioned from Red’s or a cinnamon roll from Pavel’s with a banana and black coffee, while reading the weekly newspaper to find a movie or play to attend. Maybe the outdoor forest theatre is open this time of year? ',
+      'An ideal spot to sip a cup of black coffee in the morning with an underripe banana and a cinnamon roll from Pavel’s. Also a great place to search the weekly newspaper to find a movie or play to attend. Maybe the outdoor forest theatre is open this time of year? (Goodbye Pavels Bakerei, my heart broke when I learned of your closure...)',
     position: DECK_CHAIR_POSITION,
-    interactionRadius: 1.5,
+    overlayImage: '/photos/pavels-bakerei.png',
+    // overlayImageGallery: ['/photos/reds-donuts.png'],
+    // No newspaperTextPosition override — this is the only newspaper-style
+    // object right now, so position is tuned directly via
+    // .focus-newspaper-text's top/left in FocusLayoutNewspaper.css instead
+    // of here. An inline override always wins over that CSS default (see
+    // the type comment above), so add one back only once a second object
+    // needs a genuinely different position than this one.
+    interactionRadius: 2.5,
     prompt: 'to inspect',
-    visual: { kind: 'none' },
+    layout: 'newspaper-style',
   },
   {
     // TODO: template entry — fill in title/description/prompt.
@@ -255,9 +283,9 @@ export const interactiveObjects: InteractiveObjectData[] = [
     position: BACK_DOORS_POSITION,
     interactionRadius: 2,
     prompt: 'to inspect',
-    // 'none': the doors are rendered by House.tsx, not plants.ts, but the
+    layout: 'image-row',
+    // The doors are rendered by House.tsx, not plants.ts, but the
     // pattern's the same — this entry only adds proximity/popup on top.
-    visual: { kind: 'none' },
   },
   {
     id: 'stair-top',
@@ -266,7 +294,6 @@ export const interactiveObjects: InteractiveObjectData[] = [
     prompt: 'to go down to the yard',
     action: 'descend-stairs',
     // The stairs themselves are already rendered by Deck.tsx.
-    visual: { kind: 'none' },
   },
   {
     id: 'stair-bottom',
@@ -274,6 +301,5 @@ export const interactiveObjects: InteractiveObjectData[] = [
     interactionRadius: 1.8,
     prompt: 'to go up to the deck',
     action: 'ascend-stairs',
-    visual: { kind: 'none' },
   },
 ];

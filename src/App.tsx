@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { useInput } from './systems/useInput'
@@ -9,8 +9,12 @@ import { CONTENT_FADE_DURATION } from './data/focusTiming'
 import { ControlsHint } from './components/ControlsHint'
 import { FocusHint } from './components/FocusHint'
 import { ProximityHint } from './components/ProximityHint'
+import { FocusLayoutImageRow } from './components/FocusLayoutImageRow'
+import { FocusLayoutNewspaper } from './components/FocusLayoutNewspaper'
+import { FocusLayoutStrawberry } from './components/FocusLayoutStrawberry'
 import { Scene } from './Scene'
 import { SPAWN_CAM_POS } from './data/spawn'
+import './focus.css'
 
 // ── Scale / child's-eye-view tuning ─────────────────────────────────────────
 const CAM_FOV = 58   // narrower than a fisheye-wide FOV — keeps the world from feeling flat/distant
@@ -164,49 +168,21 @@ function GardenView() {
 
       {/* Focus mode — content driven by focusObject data, no card/panel/border.
           The world stays visible and interactive behind it. Fades in only
-          after the fog above has finished arriving (see the effect above). */}
+          after the fog above has finished arriving (see the effect above).
+          Which component renders depends on focusObject.layout — see
+          src/components/FocusLayout*.tsx. Adding a new layout kind means
+          adding a new file here, not another branch. */}
       {focusObject && (
         <div className="focus-content">
-          <div
-            className="focus-layout"
-            style={{
-              opacity: contentVisible ? 1 : 0,
-              transform: contentVisible ? 'translateX(6%) translateY(0)' : 'translateX(6%) translateY(14px)',
-              transition: `opacity ${CONTENT_FADE_DURATION}s ease, transform ${CONTENT_FADE_DURATION}s ease`,
-            }}
-          >
-            <div className="focus-text">
-              <h2 className="focus-title">{focusObject.title}</h2>
-              <hr className="focus-divider" />
-              <p className="focus-description">{focusObject.description}</p>
-              {focusObject.href && (
-                <Link
-                  className="focus-link"
-                  to={focusObject.href}
-                  style={{ pointerEvents: contentVisible ? 'auto' : 'none' }}
-                >
-                  {focusObject.linkLabel ?? 'Read more'}
-                </Link>
-              )}
-            </div>
-            {focusObject.viewerModel && (
-              <div className="focus-image-wrap">
-                <ObjectViewer model={focusObject.viewerModel} />
-              </div>
-            )}
-            {focusObject.overlayImage && (
-              <div className="focus-image-wrap">
-                <img className="focus-image" src={focusObject.overlayImage} alt={focusObject.title} />
-                {focusObject.overlayImageGallery && (
-                  <div className="focus-image-gallery">
-                    {focusObject.overlayImageGallery.map(src => (
-                      <img key={src} className="focus-image-gallery-item" src={src} alt={focusObject.title} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {focusObject.layout === 'image-row' && (
+            <FocusLayoutImageRow focusObject={focusObject} visible={contentVisible} />
+          )}
+          {focusObject.layout === 'newspaper-style' && (
+            <FocusLayoutNewspaper focusObject={focusObject} visible={contentVisible} />
+          )}
+          {focusObject.layout === 'strawberry-style' && (
+            <FocusLayoutStrawberry focusObject={focusObject} visible={contentVisible} />
+          )}
         </div>
       )}
 
