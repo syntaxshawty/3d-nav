@@ -22,11 +22,10 @@ const CAM_FOV = 58   // narrower than a fisheye-wide FOV — keeps the world fro
 // ── Focus mode pacing ─────────────────────────────────────────────────────
 // Two-stage reveal: the fog (scene fog + canvas blur + fog gradient) rolls in
 // first, on its own, so the world visibly recedes before any text shows up —
-// then the title/description/image fade in on top of it. Closing reverses
-// the order (content out, then fog out) rather than just running the same
-// timeline backwards.
-const FOG_FADE_DURATION      = 2.5  // seconds — how long the fog itself takes to fade in/out
-const CONTENT_FADE_DURATION  = .5   // seconds — content's own fade + slide, once the fog has arrived
+// then the layout component (see FocusLayout*) fades in on top of it, using
+// the same CONTENT_FADE_DURATION. Closing reverses the order (content out,
+// then fog out) rather than just running the same timeline backwards.
+const FOG_FADE_DURATION = 2.5  // seconds — how long the fog itself takes to fade in/out
 // Scene desaturates/softens to feel like it's receding into memory, without
 // losing the environment entirely — it stays visible (and interactive)
 // behind the fog.
