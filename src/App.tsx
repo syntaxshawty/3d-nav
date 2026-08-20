@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { useInput } from './systems/useInput'
-import { type InteractiveObjectData } from './data/interactiveObjects'
-import { ObjectViewer } from './components/ObjectViewer'
+import { createPlayerController } from './systems/playerController'
+import { type InteractiveObjectData, type InteractiveContentObject } from './data/interactiveObjects'
+import { CONTENT_FADE_DURATION } from './data/focusTiming'
 import { ControlsHint } from './components/ControlsHint'
 import { FocusHint } from './components/FocusHint'
 import { ProximityHint } from './components/ProximityHint'
@@ -41,7 +42,10 @@ function GardenView() {
   // control comes back immediately rather than waiting out the closing fade.
   const playerRef = useRef(createPlayerController())
 
-  const [activeObject, setActiveObject] = useState<InteractiveObjectData | null>(null)
+  // Only ever holds a content object — action triggers (e.g. the stairs)
+  // short-circuit in the E-key handler below before setActiveObject is
+  // ever called, so this is narrower than nearbyObjectRef's type on purpose.
+  const [activeObject, setActiveObject] = useState<InteractiveContentObject | null>(null)
   // Drives the fog (scene fog + canvas blur + fog gradient) — the first
   // stage of the reveal, kept separate from activeObject so it can fade in
   // after a short delay instead of popping in the instant E is pressed.
@@ -52,7 +56,7 @@ function GardenView() {
   // The object actually rendered by focus mode — stays populated until both
   // stages have finished fading out, so closing has something to animate
   // instead of the content vanishing instantly.
-  const [focusObject, setFocusObject] = useState<InteractiveObjectData | null>(null)
+  const [focusObject, setFocusObject] = useState<InteractiveContentObject | null>(null)
   // showHint starts true; set to false the first time any movement key is pressed.
   const [showHint, setShowHint] = useState(true)
 
@@ -97,9 +101,13 @@ function GardenView() {
       if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || playerRef.current.transitioning) return
       const obj = nearbyObjectRef.current
       if (obj.animation) playerRef.current.playAnimation(obj.animation)
-      if (obj.action === 'descend-stairs')      playerRef.current.useStairs('down')
-      else if (obj.action === 'ascend-stairs')  playerRef.current.useStairs('up')
-      else                                       setActiveObject(obj)
+      // Explicit === undefined check (not a bare `else`) so TypeScript can
+      // actually narrow obj to InteractiveContentObject here — excluding
+      // both action literals via a bare else doesn't propagate through a
+      // discriminated union the same way a positive check on each does.
+      if (obj.action === 'descend-stairs')       playerRef.current.useStairs('down')
+      else if (obj.action === 'ascend-stairs')   playerRef.current.useStairs('up')
+      else if (obj.action === undefined)         setActiveObject(obj)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

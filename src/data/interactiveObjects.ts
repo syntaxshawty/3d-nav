@@ -16,28 +16,23 @@ import { HOUSE_POSITION } from './houseGeometry';
 // [number, number, number] tuple.
 export type Position = Vector3Tuple;
 
-export interface InteractiveObjectData {
+// Shared by every interactive object regardless of what happens on
+// interact — proximity detection (position/interactionRadius), the prompt
+// caption, in-world rendering (visual), and animation (see the note on
+// InteractiveActionTrigger.action below for why animation lives here and
+// not on InteractiveContentObject alone).
+interface InteractiveObjectBase {
   id: string;
-  title: string;
-  description: string;
   position: Position;
   interactionRadius: number; // player must be within this many units to trigger a prompt
   prompt: string; // caption shown next to the Enter-key glyph in the proximity prompt (e.g. "to inspect")
-  href?: string; // optional internal route for a full page
-  linkLabel?: string; // button label for href (defaults to "Read more")
-  viewerModel?: string; // GLB path — if set, the overlay shows a spinnable 3D preview of this model
-  overlayImage?: string; // photo path — if set, the overlay shows this image above the description (e.g. a scanned keepsake related to the object)
-  overlayImageGallery?: string[]; // additional photo paths — if set, rendered as a 2x2 grid beneath overlayImage
-  // If set, E plays this scripted movement instead of opening the info
-  // overlay — see the stair-transition handling in App.tsx. title/description
-  // are unused for these (the overlay never opens) but stay required so every
-  // entry still reads as a real object at a glance.
-  action?: 'descend-stairs' | 'ascend-stairs';
-  // If set, E also plays this clip name (from cat_animated.glb) once on the
-  // player's avatar, alongside the normal info overlay — see AnimatedCat.tsx.
-  // Movement locks for the clip's duration (same playerRef.transitioning
-  // the stair transition uses), so unlike `action` this doesn't replace
-  // the overlay.
+  // If set, E plays this clip name (from cat_animated.glb) once on the
+  // player's avatar — see AnimatedCat.tsx. Kept on the shared base, not
+  // InteractiveContentObject alone, because App.tsx's E-key handler checks
+  // this unconditionally, before it looks at `action` — so an action
+  // trigger and an animation can already coexist on one object today, even
+  // though no current entry does both. (Animation/effect modeling as its
+  // own concern is a separate, later change — not part of this split.)
   animation?: string;
   visual: {
     kind: string; // determines which geometry to render: 'none' | 'flower' | 'bench' | 'image' | ...
@@ -46,6 +41,44 @@ export interface InteractiveObjectData {
     imageScale?: number; // width in world units of the image billboard (defaults to 1.5)
   };
 }
+
+// A scripted world action (currently just the two stair triggers) — E
+// plays the scripted movement (see the stair-transition handling in
+// App.tsx) instead of opening the info overlay, so it carries only what's
+// needed to identify and execute that action, not any content/presentation
+// fields (those never apply — the overlay never opens for these).
+export interface InteractiveActionTrigger extends InteractiveObjectBase {
+  action: 'descend-stairs' | 'ascend-stairs';
+}
+
+// Everything that opens the info overlay on interact. `action` is always
+// undefined here (vs. a required literal on InteractiveActionTrigger) —
+// that's the discriminant App.tsx's E-key handler already narrows on.
+export interface InteractiveContentObject extends InteractiveObjectBase {
+  action?: undefined;
+  title: string;
+  description: string;
+  href?: string; // optional internal route for a full page
+  linkLabel?: string; // button label for href (defaults to "Read more")
+  viewerModel?: string; // GLB path — a reusable primitive (see ObjectViewer.tsx); currently used by 'strawberry-style', available to any future bespoke layout
+  overlayImage?: string; // photo/gif path — shown when layout is 'image-row', 'newspaper-style', or 'strawberry-style' (main visual differs per layout — see the FocusLayout* components)
+  overlayImageGallery?: string[]; // additional photo paths — shown alongside overlayImage, same inline row, when layout is 'image-row'
+  // Where the readable text pocket sits over the photo, when layout is
+  // 'newspaper-style' — CSS top/left values, positioned absolute within
+  // the photo's own box (so it tracks a spot on the page, e.g. blank ad
+  // space, regardless of viewport size). Per-object because that spot is
+  // different in every scanned photo; falls back to .focus-newspaper-text's
+  // default position if omitted.
+  newspaperTextPosition?: { top: string; left: string };
+  // Which overlay treatment to render for this object — see the switch in
+  // App.tsx. Each object is meant to get its own bespoke layout eventually
+  // (see 'newspaper-style'/'strawberry-style' as the model to follow);
+  // 'image-row' is the interim catch-all for everything that hasn't been
+  // given one yet, not a "default" to keep reusing long-term.
+  layout: 'image-row' | 'newspaper-style' | 'strawberry-style';
+}
+
+export type InteractiveObjectData = InteractiveActionTrigger | InteractiveContentObject;
 
 // Shared with Backyard.tsx so the real strawberry-pot model (rendered there)
 // and this proximity/interaction entry always agree on where the pot is.
@@ -228,8 +261,6 @@ export const interactiveObjects: InteractiveObjectData[] = [
   },
   {
     id: 'stair-top',
-    title: 'Deck Stairs',
-    description: '',
     position: STAIR_TOP_POSITION,
     interactionRadius: 1.8,
     prompt: 'to go down to the yard',
@@ -239,8 +270,6 @@ export const interactiveObjects: InteractiveObjectData[] = [
   },
   {
     id: 'stair-bottom',
-    title: 'Deck Stairs',
-    description: '',
     position: STAIR_BASE_POSITION,
     interactionRadius: 1.8,
     prompt: 'to go up to the deck',
