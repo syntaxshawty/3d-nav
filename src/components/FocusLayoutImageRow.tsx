@@ -1,4 +1,4 @@
-import { type ImageRowContent } from '../data/interactiveObjects'
+import { type PlaceholderOverlay } from '../data/interactiveObjects'
 import { CONTENT_FADE_DURATION } from '../data/focusTiming'
 import { FocusText } from './FocusText'
 
@@ -7,8 +7,10 @@ import { FocusText } from './FocusText'
 // all, for objects that are just a memory in words. The interim catch-all
 // layout for anything that hasn't been given its own bespoke treatment yet
 // (see 'newspaper-style'/'strawberry-style' for what that looks like).
-export function FocusLayoutImageRow({ focusObject, visible }: { focusObject: ImageRowContent; visible: boolean }) {
-  const hasImages = focusObject.overlayImage || focusObject.overlayImageGallery?.length
+// title comes from the outer InteractiveObject, overlay from action.overlay
+// — passed as two separate props since App.tsx's data has them split now.
+export function FocusLayoutImageRow({ title, overlay, visible }: { title: string; overlay: PlaceholderOverlay; visible: boolean }) {
+  const hasImages = overlay.overlayImage || overlay.overlayImageGallery?.length
   return (
     <div
       className="focus-layout focus-layout--image-row"
@@ -20,16 +22,16 @@ export function FocusLayoutImageRow({ focusObject, visible }: { focusObject: Ima
     >
       {hasImages && (
         <div className="focus-images">
-          {focusObject.overlayImage && (
-            <img className="focus-image" src={focusObject.overlayImage} alt={focusObject.title} />
+          {overlay.overlayImage && (
+            <img className="focus-image" src={overlay.overlayImage} alt={title} />
           )}
-          {focusObject.overlayImageGallery?.map(src => (
-            <img key={src} className="focus-image" src={src} alt={focusObject.title} />
+          {overlay.overlayImageGallery?.map(src => (
+            <img key={src} className="focus-image" src={src} alt={title} />
           ))}
         </div>
       )}
 
-      <FocusText focusObject={focusObject} />
+      <FocusText title={title} description={overlay.description} />
     </div>
   )
 }

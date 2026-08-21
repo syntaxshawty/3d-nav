@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { useInput } from './systems/useInput'
 import { createPlayerController } from './systems/playerController'
-import { type InteractiveObjectData, type InteractiveContentObject } from './data/interactiveObjects'
+import { type InteractiveObject } from './data/interactiveObjects'
 import { CONTENT_FADE_DURATION } from './data/focusTiming'
 import { ControlsHint } from './components/ControlsHint'
 import { FocusHint } from './components/FocusHint'
@@ -34,7 +34,7 @@ const FOCUS_SCENE_FILTER = 'blur(4px) saturate(0.4) brightness(0.75)'
 // The walking scene: owns all state, renders HTML layer + Canvas
 function GardenView() {
   const movement       = useInput()
-  const nearbyObjectRef = useRef<InteractiveObjectData | null>(null)
+  const nearbyObjectRef = useRef<InteractiveObject | null>(null)
   // Groups every player-owned control (reset/useStairs/playAnimation
   // actions, transitioning/animationLock/movementLock state) behind one
   // ref instead of six separate ones — see playerController.ts.
@@ -45,10 +45,13 @@ function GardenView() {
   // control comes back immediately rather than waiting out the closing fade.
   const playerRef = useRef(createPlayerController())
 
-  // Only ever holds a content object — action triggers (e.g. the stairs)
-  // short-circuit in the E-key handler below before setActiveObject is
-  // ever called, so this is narrower than nearbyObjectRef's type on purpose.
-  const [activeObject, setActiveObject] = useState<InteractiveContentObject | null>(null)
+  // Only ever holds an object whose action is 'open-overlay' — action
+  // triggers (e.g. the stairs) short-circuit in the E-key handler below
+  // before setActiveObject is ever called. Not narrowed at the type level
+  // (InteractiveObject covers both kinds) since that invariant lives in
+  // the handler's control flow, not the data shape — see the render check
+  // below for where that gets asserted via focusObject.action.type.
+  const [activeObject, setActiveObject] = useState<InteractiveObject | null>(null)
   // Drives the fog (scene fog + canvas blur + fog gradient) — the first
   // stage of the reveal, kept separate from activeObject so it can fade in
   // after a short delay instead of popping in the instant E is pressed.
@@ -59,7 +62,7 @@ function GardenView() {
   // The object actually rendered by focus mode — stays populated until both
   // stages have finished fading out, so closing has something to animate
   // instead of the content vanishing instantly.
-  const [focusObject, setFocusObject] = useState<InteractiveContentObject | null>(null)
+  const [focusObject, setFocusObject] = useState<InteractiveObject | null>(null)
   // showHint starts true; set to false the first time any movement key is pressed.
   const [showHint, setShowHint] = useState(true)
 
@@ -104,13 +107,12 @@ function GardenView() {
       if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || playerRef.current.transitioning) return
       const obj = nearbyObjectRef.current
       if (obj.animation) playerRef.current.playAnimation(obj.animation)
-      // Explicit === undefined check (not a bare `else`) so TypeScript can
-      // actually narrow obj to InteractiveContentObject here — excluding
-      // both action literals via a bare else doesn't propagate through a
-      // discriminated union the same way a positive check on each does.
-      if (obj.action === 'descend-stairs')       playerRef.current.useStairs('down')
-      else if (obj.action === 'ascend-stairs')   playerRef.current.useStairs('up')
-      else if (obj.action === undefined)         setActiveObject(obj)
+      // action is always a defined object now (a proper 3-way discriminated
+      // union on .type), so this is a plain positive-check chain — no more
+      // undefined-vs-literal narrowing workaround needed here.
+      if (obj.action.type === 'descend-stairs')      playerRef.current.useStairs('down')
+      else if (obj.action.type === 'ascend-stairs')  playerRef.current.useStairs('up')
+      else if (obj.action.type === 'open-overlay')   setActiveObject(obj)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -168,19 +170,22 @@ function GardenView() {
       {/* Focus mode — content driven by focusObject data, no card/panel/border.
           The world stays visible and interactive behind it. Fades in only
           after the fog above has finished arriving (see the effect above).
-          Which component renders depends on focusObject.layout — see
-          src/components/FocusLayout*.tsx. Adding a new layout kind means
-          adding a new file here, not another branch. */}
-      {focusObject && (
+          Which component renders depends on focusObject.action.overlay.layout
+          — see src/components/FocusLayout*.tsx. Adding a new layout kind
+          means adding a new file here, not another branch. The outer
+          action.type === 'open-overlay' check is always true at runtime by
+          construction (see activeObject's comment above) but is what lets
+          TypeScript narrow focusObject.action to the { overlay } branch below. */}
+      {focusObject && focusObject.action.type === 'open-overlay' && (
         <div className="focus-content">
-          {focusObject.layout === 'image-row' && (
-            <FocusLayoutImageRow focusObject={focusObject} visible={contentVisible} />
+          {focusObject.action.overlay.layout === 'image-row' && (
+            <FocusLayoutImageRow title={focusObject.title} overlay={focusObject.action.overlay} visible={contentVisible} />
           )}
-          {focusObject.layout === 'newspaper-style' && (
-            <FocusLayoutNewspaper focusObject={focusObject} visible={contentVisible} />
+          {focusObject.action.overlay.layout === 'newspaper-style' && (
+            <FocusLayoutNewspaper title={focusObject.title} overlay={focusObject.action.overlay} visible={contentVisible} />
           )}
-          {focusObject.layout === 'strawberry-style' && (
-            <FocusLayoutStrawberry focusObject={focusObject} visible={contentVisible} />
+          {focusObject.action.overlay.layout === 'strawberry-style' && (
+            <FocusLayoutStrawberry overlay={focusObject.action.overlay} visible={contentVisible} />
           )}
         </div>
       )}

@@ -7,7 +7,7 @@ import type { PlayerController } from './systems/playerController'
 import { usePlayerController } from './systems/usePlayerController'
 import { useFollowCamera } from './systems/useFollowCamera'
 import { useProximity } from './systems/useProximity'
-import { type InteractiveObjectData } from './data/interactiveObjects'
+import { type InteractiveObject } from './data/interactiveObjects'
 import { Deck } from './environment/Deck'
 import { House } from './environment/House'
 import { SPAWN_POS } from './data/spawn'
@@ -57,7 +57,7 @@ function Player({
   playerRef,
 }: {
   movement:        MutableRefObject<Movement>
-  nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>
+  nearbyObjectRef: MutableRefObject<InteractiveObject | null>
   playerRef:       MutableRefObject<PlayerController>
 }) {
   const {
@@ -131,7 +131,7 @@ export function Scene({
   fogActive,
 }: {
   movement:        MutableRefObject<Movement>
-  nearbyObjectRef: MutableRefObject<InteractiveObjectData | null>
+  nearbyObjectRef: MutableRefObject<InteractiveObject | null>
   playerRef:       MutableRefObject<PlayerController>
   fogActive:       boolean
 }) {
