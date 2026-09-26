@@ -1,6 +1,6 @@
-import { type PlaceholderOverlay } from '../data/interactiveObjects'
-import { CONTENT_FADE_DURATION } from '../data/focusTiming'
-import { FocusText } from './FocusText'
+import { type PlaceholderOverlay } from '../data/interactiveObjects';
+import { CONTENT_FADE_DURATION } from '../data/focusTiming';
+import { FocusText } from './FocusText';
 
 // Main overlayImage plus any overlayImageGallery entries, shown as one
 // inline row of image cards above the title/description — or no images at
@@ -9,8 +9,16 @@ import { FocusText } from './FocusText'
 // (see 'newspaper-style'/'strawberry-style' for what that looks like).
 // title comes from the outer InteractiveObject, overlay from action.overlay
 // — passed as two separate props since App.tsx's data has them split now.
-export function FocusLayoutImageRow({ title, overlay, visible }: { title: string; overlay: PlaceholderOverlay; visible: boolean }) {
-  const hasImages = overlay.overlayImage || overlay.overlayImageGallery?.length
+export function FocusLayoutImageRow({
+  title,
+  overlay,
+  visible,
+}: {
+  title: string;
+  overlay: PlaceholderOverlay;
+  visible: boolean;
+}) {
+  const hasImages = overlay.overlayImage || overlay.overlayImageGallery?.length;
   return (
     <div
       className="focus-layout focus-layout--image-row"
@@ -23,9 +31,13 @@ export function FocusLayoutImageRow({ title, overlay, visible }: { title: string
       {hasImages && (
         <div className="focus-images">
           {overlay.overlayImage && (
-            <img className="focus-image" src={overlay.overlayImage} alt={title} />
+            <img
+              className="focus-image"
+              src={overlay.overlayImage}
+              alt={title}
+            />
           )}
-          {overlay.overlayImageGallery?.map(src => (
+          {overlay.overlayImageGallery?.map((src) => (
             <img key={src} className="focus-image" src={src} alt={title} />
           ))}
         </div>
@@ -33,5 +45,5 @@ export function FocusLayoutImageRow({ title, overlay, visible }: { title: string
 
       <FocusText title={title} description={overlay.description} />
     </div>
-  )
+  );
 }

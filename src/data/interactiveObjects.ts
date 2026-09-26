@@ -24,8 +24,7 @@ export type Position = Vector3Tuple;
 // is only for triggers with no corresponding rendered prop at all, like
 // the stairs (rendered by Deck.tsx) or the back doors (House.tsx).
 export type InteractionTrigger =
-  | { objectId: string; offset?: Position }
-  | { coords: Position };
+  { objectId: string; offset?: Position } | { coords: Position };
 
 export type Action =
   | { type: 'open-overlay'; overlay: OverlayStyle }
@@ -76,9 +75,7 @@ export interface StrawberryOverlay {
 }
 
 export type OverlayStyle =
-  | PlaceholderOverlay
-  | NewspaperOverlay
-  | StrawberryOverlay;
+  PlaceholderOverlay | NewspaperOverlay | StrawberryOverlay;
 
 // The house's front (yard-facing) door doesn't have its own world-space
 // position — it's rendered as a child of House's group, offset from

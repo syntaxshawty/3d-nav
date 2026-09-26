@@ -20,8 +20,7 @@
 .focus-newspaper {
   display: block;
   width: 100%;
-  filter:
-    drop-shadow(0 30px 40px rgba(0, 0, 0, 0.55))
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.55))
     drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
   transform: perspective(1400px) rotateX(2deg) rotateY(-3deg);
   animation: focus-newspaper-float 7s ease-in-out infinite;
@@ -45,8 +44,14 @@
 }
 
 @keyframes focus-newspaper-float {
-  0%, 100% { transform: perspective(1400px) rotateX(2deg) rotateY(-3deg) translateY(0); }
-  50%      { transform: perspective(1400px) rotateX(2deg) rotateY(-3deg) translateY(-12px); }
+  0%,
+  100% {
+    transform: perspective(1400px) rotateX(2deg) rotateY(-3deg) translateY(0);
+  }
+  50% {
+    transform: perspective(1400px) rotateX(2deg) rotateY(-3deg)
+      translateY(-12px);
+  }
 }
 
 .focus-newspaper-text {

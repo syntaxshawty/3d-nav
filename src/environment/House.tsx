@@ -1,17 +1,24 @@
-import { DoubleSide } from 'three'
-import { GltfProp } from '../components/GltfProp'
+import { DoubleSide } from 'three';
+import { GltfProp } from '../components/GltfProp';
 import {
-  HOUSE_POSITION, HOUSE_WIDTH, HOUSE_DEPTH, WALL_HEIGHT,
-  ROOF_SHAPE, ROOF_POSITION_Z, ROOF_EXTRUDE_DEPTH,
-  FRENCH_DOOR_URL, FRENCH_DOOR_POSITION, FRENCH_DOOR_SCALE,
-} from '../data/houseGeometry'
+  HOUSE_POSITION,
+  HOUSE_WIDTH,
+  HOUSE_DEPTH,
+  WALL_HEIGHT,
+  ROOF_SHAPE,
+  ROOF_POSITION_Z,
+  ROOF_EXTRUDE_DEPTH,
+  FRENCH_DOOR_URL,
+  FRENCH_DOOR_POSITION,
+  FRENCH_DOOR_SCALE,
+} from '../data/houseGeometry';
 
 // Soft, desaturated blue for all wall surfaces — a single flat massing
 // color, since this is a temporary blockout, not final art.
-const WALL_COLOR = '#8CA0B3'
+const WALL_COLOR = '#8CA0B3';
 // Neutral, warm-gray roof — contrasts against the walls without competing
 // with them.
-const ROOF_COLOR = '#4B4844'
+const ROOF_COLOR = '#4B4844';
 
 // Temporary blockout for the rear of the house the deck attaches to: a box
 // for the walls plus a simple gable roof, both in flat primitive geometry.
@@ -21,14 +28,22 @@ const ROOF_COLOR = '#4B4844'
 export function House() {
   return (
     <group position={HOUSE_POSITION}>
-      <mesh position={[0, WALL_HEIGHT / 2, HOUSE_DEPTH / 2]} castShadow receiveShadow>
+      <mesh
+        position={[0, WALL_HEIGHT / 2, HOUSE_DEPTH / 2]}
+        castShadow
+        receiveShadow
+      >
         <boxGeometry args={[HOUSE_WIDTH, WALL_HEIGHT, HOUSE_DEPTH]} />
         <meshStandardMaterial color={WALL_COLOR} roughness={0.85} />
       </mesh>
       <GableRoof />
-      <GltfProp url={FRENCH_DOOR_URL} position={FRENCH_DOOR_POSITION} scale={FRENCH_DOOR_SCALE} />
+      <GltfProp
+        url={FRENCH_DOOR_URL}
+        position={FRENCH_DOOR_POSITION}
+        scale={FRENCH_DOOR_SCALE}
+      />
     </group>
-  )
+  );
 }
 
 // A single triangular-prism mesh — see ROOF_SHAPE in houseGeometry.ts for
@@ -38,8 +53,14 @@ export function House() {
 function GableRoof() {
   return (
     <mesh position={[0, 0, ROOF_POSITION_Z]} castShadow receiveShadow>
-      <extrudeGeometry args={[ROOF_SHAPE, { depth: ROOF_EXTRUDE_DEPTH, bevelEnabled: false }]} />
-      <meshStandardMaterial color={ROOF_COLOR} roughness={0.75} side={DoubleSide} />
+      <extrudeGeometry
+        args={[ROOF_SHAPE, { depth: ROOF_EXTRUDE_DEPTH, bevelEnabled: false }]}
+      />
+      <meshStandardMaterial
+        color={ROOF_COLOR}
+        roughness={0.75}
+        side={DoubleSide}
+      />
     </mesh>
-  )
+  );
 }

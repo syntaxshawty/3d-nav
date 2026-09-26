@@ -3,4 +3,4 @@
 // exactly — see the two-stage reveal effect in App.tsx. One constant, not
 // a copy per component, so tuning the pacing never means hunting down
 // every place it's duplicated.
-export const CONTENT_FADE_DURATION = 0.5 // seconds
+export const CONTENT_FADE_DURATION = 0.5; // seconds

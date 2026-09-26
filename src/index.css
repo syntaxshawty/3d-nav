@@ -3,7 +3,7 @@
    parse this file first, discover the import, then start the font request,
    adding a serial round-trip before text renders in the right font. */
 .freckle-face-regular {
-  font-family: "Freckle Face", system-ui;
+  font-family: 'Freckle Face', system-ui;
   font-weight: 400;
   font-style: normal;
 }

@@ -130,7 +130,10 @@ export function usePlayerController(
         -Math.cos(yawRef.current),
       );
       if (t >= 1) scripted.current = false;
-    } else if (!playerRef.current.animationLock && !playerRef.current.movementLock) {
+    } else if (
+      !playerRef.current.animationLock &&
+      !playerRef.current.movementLock
+    ) {
       // ── Rotation ────────────────────────────────────────────────────────
       // Note: this group's own rotation is intentionally never set from yaw
       // — yawRef alone drives the camera and movement math, and AnimatedCat
@@ -219,7 +222,8 @@ export function usePlayerController(
     const stairK = 1 - Math.exp(-delta / STAIR_BLEND_TIME);
     stairBlendRef.current += (stairTarget - stairBlendRef.current) * stairK;
 
-    playerRef.current.transitioning = scripted.current || playerRef.current.animationLock;
+    playerRef.current.transitioning =
+      scripted.current || playerRef.current.animationLock;
   });
 
   const reset = useCallback(() => {

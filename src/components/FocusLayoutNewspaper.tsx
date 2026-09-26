@@ -1,6 +1,6 @@
-import { type NewspaperOverlay } from '../data/interactiveObjects'
-import { CONTENT_FADE_DURATION } from '../data/focusTiming'
-import './FocusLayoutNewspaper.css'
+import { type NewspaperOverlay } from '../data/interactiveObjects';
+import { CONTENT_FADE_DURATION } from '../data/focusTiming';
+import './FocusLayoutNewspaper.css';
 
 // The photo is the primary element — no title, no separate text column.
 // The description floats in its own small fog pocket over the photo (see
@@ -11,7 +11,15 @@ import './FocusLayoutNewspaper.css'
 // no presence check is needed before rendering it. title (from the outer
 // InteractiveObject) is only used for the image's alt text here — this
 // layout doesn't render a visible title.
-export function FocusLayoutNewspaper({ title, overlay, visible }: { title: string; overlay: NewspaperOverlay; visible: boolean }) {
+export function FocusLayoutNewspaper({
+  title,
+  overlay,
+  visible,
+}: {
+  title: string;
+  overlay: NewspaperOverlay;
+  visible: boolean;
+}) {
   return (
     <div
       className="focus-newspaper-layout"
@@ -26,5 +34,5 @@ export function FocusLayoutNewspaper({ title, overlay, visible }: { title: strin
         <p className="focus-description">{overlay.description}</p>
       </div>
     </div>
-  )
+  );
 }
