@@ -167,3 +167,152 @@ export const STAIR_ASCEND_YAW = STAIR_ANGLE; // back toward the deck, up the sta
 // dilute the angle), not a guessed angle, so anything that visually leans
 // into the slope (e.g. the player model) matches the actual stair geometry.
 export const STAIR_SLOPE_PITCH = Math.atan2(DECK_TOP_Y, STAIR_DESCENT_RUN);
+
+// Horizontal distance of (x, z) along the descent direction, measured from
+// the chamfered edge the stairs start at — negative back on the deck,
+// STAIR_DESCENT_RUN at the foot of the stairs.
+export function stairDistance(x: number, z: number) {
+  return (
+    (x - STAIR_CORNER_X) * STAIR_DIR_X + (z - STAIR_CORNER_Z) * STAIR_DIR_Z
+  );
+}
+
+// Height of the path something walking the stairs should follow at a given
+// stairDistance: flat on the deck, then a straight line across the step
+// nosings (each tread's front edge), then down past the last riser to the
+// ground by STAIR_DESCENT_RUN. Every tread lies at or below this line, so
+// anything resting on it never sinks into a step — unlike a straight line
+// from the deck to the ground, which cuts through the deck edge and the top
+// steps.
+export function stairPathY(d: number) {
+  const nosingRun = STEP_COUNT * STEP_RUN;
+  if (d <= 0) return DECK_TOP_Y;
+  if (d <= nosingRun) return DECK_TOP_Y - (d / STEP_RUN) * STEP_RISER;
+  if (d < STAIR_DESCENT_RUN)
+    return STEP_RISER * (1 - (d - nosingRun) / (STAIR_DESCENT_RUN - nosingRun));
+  return 0;
+}
+
+// ── Surfaces under the player ───────────────────────────────────────────────
+// Height of the highest walkable surface at (x, z) that isn't above `maxY` —
+// the deck's plank top, a stair tread, or the ground. The ceiling matters
+// because nothing stops the player from walking under/through the deck's
+// outline from the yard: a surface well above whatever's asking (e.g. the
+// deck top, for a cat standing on the lawn beside it) isn't under it.
+// Used to keep the cat's paws from sinking into whatever they're over.
+export function surfaceHeightAt(x: number, z: number, maxY: number) {
+  const deckY = DECK_TOP_Y + PLANK_THICKNESS;
+  if (deckY <= maxY && isInsideDeckFootprint(x, z)) return deckY;
+
+  const d = stairDistance(x, z);
+  const lateral =
+    (x - STAIR_CORNER_X) * STAIR_DIR_Z - (z - STAIR_CORNER_Z) * STAIR_DIR_X;
+  if (
+    d >= 0 &&
+    d < STEP_COUNT * STEP_RUN &&
+    Math.abs(lateral) <= STAIR_TREAD_WIDTH / 2
+  ) {
+    const treadY = DECK_TOP_Y - STEP_RISER * (Math.floor(d / STEP_RUN) + 1);
+    if (treadY <= maxY) return treadY;
+  }
+  return 0;
+}
+
+// ── Jumping off the deck ────────────────────────────────────────────────────
+// The deck's outer edges that drop straight to the yard, each with its
+// outward normal. Left out: the house-side edge (Z=0, against the wall) and
+// the chamfered stair edge — plus a margin either side of the chamfer, so a
+// jump never lands on or clips the stairs.
+const STAIR_EDGE_MARGIN = 0.5;
+
+// How close to one of these edges the player has to be for the jump prompt
+// (the deck-edge entry in interactiveObjects.ts; see planJump in deckJump.ts).
+export const JUMP_EDGE_RADIUS = 1.0;
+
+interface DeckEdge {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  nx: number;
+  nz: number;
+}
+
+const JUMP_EDGES: DeckEdge[] = [
+  // Left side, full depth (main bar end + left arm)
+  { x0: LEFT_X, z0: LEFT_FAR_Z, x1: LEFT_X, z1: 0, nx: -1, nz: 0 },
+  // Left arm's far edge
+  {
+    x0: LEFT_X,
+    z0: LEFT_FAR_Z,
+    x1: LEFT_X + LEFT_ARM_WIDTH,
+    z1: LEFT_FAR_Z,
+    nx: 0,
+    nz: -1,
+  },
+  // Left arm's inner edge, facing the notch
+  {
+    x0: LEFT_X + LEFT_ARM_WIDTH,
+    z0: LEFT_FAR_Z,
+    x1: LEFT_X + LEFT_ARM_WIDTH,
+    z1: -MAIN_DEPTH,
+    nx: 1,
+    nz: 0,
+  },
+  // Main bar's edge inside the notch
+  {
+    x0: LEFT_X + LEFT_ARM_WIDTH,
+    z0: -MAIN_DEPTH,
+    x1: RIGHT_ARM_X0,
+    z1: -MAIN_DEPTH,
+    nx: 0,
+    nz: -1,
+  },
+  // Right arm's inner edge, facing the notch, up to the stair chamfer
+  {
+    x0: RIGHT_ARM_X0,
+    z0: RIGHT_FAR_Z + STAIR_CHAMFER + STAIR_EDGE_MARGIN,
+    x1: RIGHT_ARM_X0,
+    z1: -MAIN_DEPTH,
+    nx: -1,
+    nz: 0,
+  },
+  // Right arm's far edge, from the stair chamfer out
+  {
+    x0: RIGHT_ARM_X0 + STAIR_CHAMFER + STAIR_EDGE_MARGIN,
+    z0: RIGHT_FAR_Z,
+    x1: RIGHT_X,
+    z1: RIGHT_FAR_Z,
+    nx: 0,
+    nz: -1,
+  },
+  // Right side, full depth (right arm + main bar end)
+  { x0: RIGHT_X, z0: RIGHT_FAR_Z, x1: RIGHT_X, z1: 0, nx: 1, nz: 0 },
+];
+
+export interface NearestDeckEdge {
+  x: number; // closest point on the edge
+  z: number;
+  nx: number; // outward normal
+  nz: number;
+  dist: number; // horizontal distance from the query point to that edge
+}
+
+// Closest yard-facing edge to (x, z), measured straight out to it (the query
+// point has to be alongside the edge, not past either end of it).
+export function nearestJumpEdge(x: number, z: number): NearestDeckEdge | null {
+  let best: NearestDeckEdge | null = null;
+  for (const e of JUMP_EDGES) {
+    const ex = e.x1 - e.x0;
+    const ez = e.z1 - e.z0;
+    const len2 = ex * ex + ez * ez;
+    const t = ((x - e.x0) * ex + (z - e.z0) * ez) / len2;
+    if (t < 0 || t > 1) continue;
+    const px = e.x0 + ex * t;
+    const pz = e.z0 + ez * t;
+    const dist = Math.hypot(x - px, z - pz);
+    if (!best || dist < best.dist)
+      best = { x: px, z: pz, nx: e.nx, nz: e.nz, dist };
+  }
+  return best;
+}

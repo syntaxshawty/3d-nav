@@ -1,6 +1,7 @@
 import type { Vector3Tuple } from 'three';
 import {
   DECK_TOP_Y,
+  JUMP_EDGE_RADIUS,
   STAIR_TOP_POSITION,
   STAIR_BASE_POSITION,
 } from './deckGeometry';
@@ -23,13 +24,19 @@ export type Position = Vector3Tuple;
 // own origin, e.g. a tree's trunk rather than its whole canopy). `coords`
 // is only for triggers with no corresponding rendered prop at all, like
 // the stairs (rendered by Deck.tsx) or the back doors (House.tsx).
+// `deckEdge` isn't a point at all: it triggers anywhere along the deck's
+// yard-facing edges while the player faces out over one (see planJump in
+// systems/deckJump.ts).
 export type InteractionTrigger =
-  { objectId: string; offset?: Position } | { coords: Position };
+  | { objectId: string; offset?: Position }
+  | { coords: Position }
+  | { deckEdge: true };
 
 export type Action =
   | { type: 'open-overlay'; overlay: OverlayStyle }
   | { type: 'ascend-stairs' }
-  | { type: 'descend-stairs' };
+  | { type: 'descend-stairs' }
+  | { type: 'jump-down' };
 
 // Shared by every interactive object regardless of what happens on
 // interact — proximity detection (interactionTrigger/interactionRadius),
@@ -299,5 +306,13 @@ export const interactiveObjects: InteractiveObject[] = [
     interactionRadius: 1.8,
     interactionPrompt: 'to go up to the deck',
     action: { type: 'ascend-stairs' },
+  },
+  {
+    id: 'deck-edge',
+    title: 'Deck edge',
+    interactionTrigger: { deckEdge: true },
+    interactionRadius: JUMP_EDGE_RADIUS,
+    interactionPrompt: 'to jump down',
+    action: { type: 'jump-down' },
   },
 ];

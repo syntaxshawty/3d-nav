@@ -66,8 +66,9 @@ function Player({
     movingRef,
     stairBlendRef,
     fwdRef,
-    stairOrbitTRef,
-    stairActiveRef,
+    stairCameraTRef,
+    stairPitchRef,
+    jumpingRef,
     reset: resetPlayer,
   } = usePlayerController(movement, playerRef);
   const {
@@ -79,11 +80,16 @@ function Player({
     yawRef,
     fwdRef,
     stairBlendRef,
-    stairOrbitTRef,
+    stairCameraTRef,
     movement,
     playerRef,
   );
-  const { closestDistRef } = useProximity(groupRef, nearbyObjectRef, playerRef);
+  const { closestDistRef } = useProximity(
+    groupRef,
+    fwdRef,
+    nearbyObjectRef,
+    playerRef,
+  );
 
   // Write the reset function into playerRef so GardenView can call it from
   // a button. Composes each system's own reset — every system owns
@@ -137,7 +143,8 @@ function Player({
       <AnimatedCat
         yawRef={yawRef}
         movingRef={movingRef}
-        stairActiveRef={stairActiveRef}
+        stairPitchRef={stairPitchRef}
+        jumpingRef={jumpingRef}
         playerRef={playerRef}
       />
     </group>

@@ -1,6 +1,7 @@
 import { useRef, type MutableRefObject, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, type Group } from 'three';
+import { planJump } from './deckJump';
 import {
   interactiveObjects,
   type InteractiveObject,
@@ -15,7 +16,10 @@ const YARD_OBJECT_POSITIONS = new Map(
   yardObjects.map((o) => [o.id, new Vector3(...o.position)]),
 );
 
-function resolveTriggerPosition(trigger: InteractionTrigger): Vector3 {
+// null for a deckEdge trigger — it isn't a point; its distance is worked
+// out each frame from the player's own position and facing instead.
+function resolveTriggerPosition(trigger: InteractionTrigger): Vector3 | null {
+  if ('deckEdge' in trigger) return null;
   if ('coords' in trigger) return new Vector3(...trigger.coords);
 
   const basePosition = YARD_OBJECT_POSITIONS.get(trigger.objectId);
@@ -43,6 +47,7 @@ const OBJECT_POSITIONS = interactiveObjects.map((o) =>
 // the on-screen ProximityHint prompt directly via the DOM.
 export function useProximity(
   groupRef: RefObject<Group>,
+  fwdRef: MutableRefObject<Vector3>,
   nearbyObjectRef: MutableRefObject<InteractiveObject | null>,
   playerRef: MutableRefObject<PlayerController>,
 ) {
@@ -64,7 +69,14 @@ export function useProximity(
     let closestDist = Infinity;
     let closestEligibleDist = Infinity;
     for (let i = 0; i < interactiveObjects.length; i++) {
-      const d = pos.distanceTo(OBJECT_POSITIONS[i]);
+      const point = OBJECT_POSITIONS[i];
+      let d: number;
+      if (point) {
+        d = pos.distanceTo(point);
+      } else {
+        const fwd = fwdRef.current;
+        d = planJump(pos.x, pos.y, pos.z, fwd.x, fwd.z)?.edgeDist ?? Infinity;
+      }
       if (d < closestDist) closestDist = d;
       if (
         d < interactiveObjects[i].interactionRadius &&

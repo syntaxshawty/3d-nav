@@ -144,6 +144,7 @@ function GardenView() {
         playerRef.current.useStairs('down');
       else if (obj.action.type === 'ascend-stairs')
         playerRef.current.useStairs('up');
+      else if (obj.action.type === 'jump-down') playerRef.current.jumpDown();
       else if (obj.action.type === 'open-overlay') {
         setActiveObject(obj);
         setFocusObject(obj);

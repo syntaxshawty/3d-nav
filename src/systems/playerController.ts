@@ -15,11 +15,14 @@ export interface PlayerController {
   // Assigned by usePlayerController; called by GardenView's E-key handler
   // for objects with a scripted stair action.
   useStairs: (direction: 'down' | 'up') => void;
+  // Assigned by usePlayerController; called by GardenView's E-key handler
+  // when the player is at a yard-facing deck edge (the deck-edge object).
+  jumpDown: () => void;
   // Assigned by AnimatedCat; called by GardenView's E-key handler for
   // objects with a one-shot interaction animation.
   playAnimation: (clip: string) => void;
   // Written every frame by usePlayerController (true during the scripted
-  // stair transition or a one-shot animation); read by useFollowCamera,
+  // stair transition, a jump, or a one-shot animation); read by useFollowCamera,
   // useProximity, and GardenView's E-key handler.
   transitioning: boolean;
   // Written by AnimatedCat for the duration of a one-shot interaction
@@ -36,6 +39,7 @@ export function createPlayerController(): PlayerController {
   return {
     reset: () => {},
     useStairs: () => {},
+    jumpDown: () => {},
     playAnimation: () => {},
     transitioning: false,
     animationLock: false,

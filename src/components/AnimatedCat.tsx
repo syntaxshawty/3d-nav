@@ -5,27 +5,32 @@ import { useGLTF, useAnimations } from '@react-three/drei';
 import {
   FrontSide,
   LoopOnce,
+  Vector3,
+  type Bone,
   type AnimationAction,
   type Group,
   type Mesh,
   type MeshStandardMaterial,
 } from 'three';
 import { shortestYawDelta } from '../mathUtils';
-import { PLANK_THICKNESS } from '../data/deckGeometry';
+import { PLANK_THICKNESS, surfaceHeightAt } from '../data/deckGeometry';
+import { JUMP_CLIP } from '../systems/deckJump';
 import type { PlayerController } from '../systems/playerController';
 
 // The player's visible model — an animated cat, replacing the earlier
 // procedural bunny. Sourced from a large general-purpose quadruped
 // animation library (124 clips); only the locomotion states this project
-// actually drives (idle, forward walk, stair jump) are used. Clip names
-// below are exact matches confirmed against the source file's own clip list.
+// actually drives (idle, forward walk) are used. Clip names below are exact
+// matches confirmed against the source file's own clip list. The stairs use
+// the ordinary walk cycle too, tilted to the slope (see stairPitchRef); the
+// deck-edge jump plays JUMP_CLIP (see deckJump.ts).
 const CAT_URL = '/models/cat_animated.glb';
 const IDLE_CLIP = 'Idle_1';
 const WALK_CLIP = 'Walk_F_IP';
-// Plays for the scripted stair transition's duration (both directions)
-// instead of the normal walk cycle — see stairActiveRef below.
-const STAIR_CLIP = 'JumpFw_IP';
 const CROSSFADE_DURATION = 0.3; // seconds, between any two of the above
+// Shorter into the jump, so the crouch/push-off isn't blurred by the fade —
+// the jump's arc is timed against the clip's own takeoff (deckJump.ts).
+const JUMP_CROSSFADE_DURATION = 0.1;
 
 // The raw model loads at real-world cat size (~0.45m tall) with its own
 // rest-pose facing, neither of which match this project's child-scaled
@@ -43,18 +48,38 @@ const CAT_FACING_YAW = Math.PI; // rest pose faces +Z (toward the camera); this 
 
 const ROTATION_LERP = 0.15; // fraction of the remaining turn closed per ~frame at 60fps
 
+// ── Paw lift ──────────────────────────────────────────────────────────────
+// Some clips (the jump especially) push the paws below the model's own
+// origin — played in place, a push-off or a reach for the landing has
+// nowhere to go but down. Each frame, after the pose is applied, the lowest
+// paw is checked against the surface under it (deck, stair tread, or
+// ground; see surfaceHeightAt) and the whole model is raised by however far
+// it would otherwise sink. Rises instantly (never lets a paw clip), settles
+// back down over PAW_LIFT_RELEASE.
+const PAW_BONES = ['claw_f.L', 'claw_f.R', 'claw_b.L', 'claw_b.R'];
+const PAW_SOLE_HEIGHT = 0.016 * CAT_SCALE; // paw bones' rest height above the model's origin — where the pad actually meets the ground
+const PAW_LIFT_TOLERANCE = 0.01; // ignore sub-centimeter dips, so ordinary walking never jitters
+const PAW_LIFT_RELEASE = 0.08; // seconds to ease back down once a paw is clear
+// How far above the cat's origin a surface can be and still count as under
+// it — keeps the deck top from "catching" a cat walking beside it on the lawn.
+const PAW_SURFACE_REACH = 0.3;
+const _pawPos = new Vector3();
+
 export function AnimatedCat({
   yawRef,
   movingRef,
-  stairActiveRef,
+  stairPitchRef,
+  jumpingRef,
   playerRef,
 }: {
   yawRef: MutableRefObject<number>;
   movingRef: MutableRefObject<boolean>;
-  // True for the scripted stair transition's duration (both directions) —
-  // takes priority over movingRef so JumpFw_IP plays instead of the normal
-  // walk cycle while it's carrying the player up/down.
-  stairActiveRef: MutableRefObject<boolean>;
+  // Nose-down tilt (radians) while on the stairs, from usePlayerController —
+  // 0 everywhere else.
+  stairPitchRef: MutableRefObject<number>;
+  // True for the deck-edge jump's duration — plays JUMP_CLIP over
+  // everything else.
+  jumpingRef: MutableRefObject<boolean>;
   // playerRef.current.playAnimation is written here so GardenView's E-key
   // handler can play a one-shot clip (e.g. SharpenClaws_Vert) from outside
   // this component — same pattern as usePlayerController's useStairs.
@@ -72,11 +97,11 @@ export function AnimatedCat({
   // kept separate from yawRef itself, which the controller (App.tsx) turns
   // instantly for movement/camera purposes.
   const facingYaw = useRef(0);
-  // Name of whichever of IDLE_CLIP/WALK_CLIP/STAIR_CLIP is currently
-  // playing — crossfades to a new one only when the target actually
-  // changes, so idle/walk/stair-jump all share one switch instead of each
-  // pair needing its own boolean.
+  // Name of whichever of IDLE_CLIP/WALK_CLIP/JUMP_CLIP is currently
+  // playing — crossfades to a new one only when the target actually changes.
   const currentClipRef = useRef(IDLE_CLIP);
+  const pawBones = useRef<Bone[]>([]);
+  const pawLift = useRef(0);
 
   // Seeds facingYaw from the controller's actual starting yaw instead of the
   // 0 placeholder above, so the model doesn't visibly spin from a wrong
@@ -119,24 +144,28 @@ export function AnimatedCat({
   }, [scene]);
 
   useEffect(() => {
+    pawBones.current = PAW_BONES.map(
+      (name) => scene.getObjectByName(name) as Bone,
+    ).filter(Boolean);
+  }, [scene]);
+
+  useEffect(() => {
     actions[IDLE_CLIP]?.reset().play();
     return () => {
       Object.values(actions).forEach((action) => action?.stop());
     };
   }, [actions]);
 
-  // Whichever of idle/walk/stair-jump applies right now, in priority order —
-  // stairActiveRef wins over movingRef since the scripted transition also
-  // sets movingRef true (the cat should visibly travel, not idle, while
-  // being carried up/down).
+  // Whichever of jump/walk/idle applies right now — movingRef is also true
+  // during the scripted stair transition, so the cat walks up/down the stairs.
   const resolveLocomotionClip = useCallback(
     () =>
-      stairActiveRef.current
-        ? STAIR_CLIP
+      jumpingRef.current
+        ? JUMP_CLIP
         : movingRef.current
           ? WALK_CLIP
           : IDLE_CLIP,
-    [stairActiveRef, movingRef],
+    [jumpingRef, movingRef],
   );
 
   // One-shot interaction animations (e.g. SharpenClaws_Vert) — plays a clip
@@ -170,13 +199,22 @@ export function AnimatedCat({
   }, [actions, playerRef, resolveLocomotionClip]);
 
   useFrame((_state, delta) => {
-    // ── Crossfade between idle/walk/stair-jump on state change ────────────
+    // ── Crossfade between idle/walk/jump on state change ───────────────────
     // Skipped entirely while a one-shot interaction animation owns the mixer.
     if (!playerRef.current.animationLock) {
       const targetClip = resolveLocomotionClip();
       if (targetClip !== currentClipRef.current) {
-        actions[currentClipRef.current]?.fadeOut(CROSSFADE_DURATION);
-        actions[targetClip]?.reset().fadeIn(CROSSFADE_DURATION).play();
+        const fade =
+          targetClip === JUMP_CLIP
+            ? JUMP_CROSSFADE_DURATION
+            : CROSSFADE_DURATION;
+        actions[currentClipRef.current]?.fadeOut(fade);
+        const action = actions[targetClip]?.reset();
+        if (targetClip === JUMP_CLIP) {
+          action?.setLoop(LoopOnce, 1);
+          if (action) action.clampWhenFinished = true;
+        }
+        action?.fadeIn(fade).play();
         currentClipRef.current = targetClip;
       }
     }
@@ -186,10 +224,45 @@ export function AnimatedCat({
     const step = Math.min(1, ROTATION_LERP * delta * 60);
     facingYaw.current += shortestYawDelta(facingYaw.current, target) * step;
     groupRef.current.rotation.y = facingYaw.current;
+    // Pitch about the model's own (post-yaw) side axis — see the 'YXZ'
+    // rotation order on the group below.
+    groupRef.current.rotation.x = stairPitchRef.current;
+
+    // ── Paw lift (see PAW_BONES above) ─────────────────────────────────────
+    // Measured with the lift removed, so it's the raw sink depth this frame.
+    // drei's useAnimations registered its mixer update before this useFrame,
+    // so the bones already hold this frame's pose.
+    const group = groupRef.current;
+    group.position.y = CAT_Y_OFFSET;
+    group.updateMatrixWorld(true);
+    const originY = group.getWorldPosition(_pawPos).y;
+    let sink = 0;
+    for (const bone of pawBones.current) {
+      bone.getWorldPosition(_pawPos);
+      const surface = surfaceHeightAt(
+        _pawPos.x,
+        _pawPos.z,
+        originY + PAW_SURFACE_REACH,
+      );
+      sink = Math.max(sink, surface - (_pawPos.y - PAW_SOLE_HEIGHT));
+    }
+    const liftTarget = sink > PAW_LIFT_TOLERANCE ? sink : 0;
+    pawLift.current =
+      liftTarget >= pawLift.current
+        ? liftTarget
+        : pawLift.current +
+          (liftTarget - pawLift.current) *
+            (1 - Math.exp(-delta / PAW_LIFT_RELEASE));
+    group.position.y = CAT_Y_OFFSET + pawLift.current;
   });
 
   return (
-    <group ref={groupRef} position={[0, CAT_Y_OFFSET, 0]} scale={CAT_SCALE}>
+    <group
+      ref={groupRef}
+      position={[0, CAT_Y_OFFSET, 0]}
+      rotation={[0, 0, 0, 'YXZ']}
+      scale={CAT_SCALE}
+    >
       <primitive object={scene} />
     </group>
   );

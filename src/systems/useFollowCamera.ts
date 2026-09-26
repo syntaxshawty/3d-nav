@@ -33,29 +33,28 @@ const DRIFT_H = 0.15;
 const DRIFT_V = 0.08;
 const DRIFT_SPEED = 0.6;
 
-// ── Stair descent camera path — only while actively descending ─────────────
-// The look-target gains an extra forward/down offset (scaled by
-// usePlayerController's stairBlendRef), and the camera angle itself orbits a
-// full circle around the cat over usePlayerController's independent
-// stairOrbitTRef timer, instead of just pulling back. Distance/height swell
-// out via sin(stairOrbitT * π) — zero at both ends, peaking at the midpoint —
-// so the orbit smoothly balloons out and settles back to exactly the normal
-// follow position as it finishes, with no separate blend-out needed.
-const STAIR_LOOK_FORWARD_OFFSET = 1.6; // extra look-target distance toward the stair bottom, at full blend
-const STAIR_LOOK_DOWN_OFFSET = 0.9; // extra downward look-target offset, at full blend
-const STAIR_ORBIT_TURNS = -1; // full revolutions over the orbit — negative sweeps clockwise (viewed from above)
-const STAIR_ORBIT_HEIGHT_OFFSET = 1.1; // extra camera height at the midpoint of the orbit
-const STAIR_ORBIT_DISTANCE_OFFSET = 1.6; // extra camera distance from the cat at the midpoint of the orbit
+// ── Stair descent camera — only while actively descending ──────────────────
+// Stays behind the cat the whole way (no orbit). The look-target gains a
+// small forward/down offset (scaled by usePlayerController's stairBlendRef)
+// so the view tips toward the bottom of the stairs, and the camera eases a
+// little further back and up over usePlayerController's stairCameraTRef
+// timer. That swell follows sin(stairCameraT * π) — zero at both ends,
+// peaking at the midpoint — so it settles back to exactly the normal follow
+// position as it finishes, with no separate blend-out needed.
+const STAIR_LOOK_FORWARD_OFFSET = 0.8; // extra look-target distance toward the stair bottom, at full blend
+const STAIR_LOOK_DOWN_OFFSET = 0.4; // extra downward look-target offset, at full blend
+const STAIR_CAMERA_HEIGHT_OFFSET = 0.4; // extra camera height at the midpoint of the descent
+const STAIR_CAMERA_DISTANCE_OFFSET = 0.6; // extra camera distance from the cat at the midpoint of the descent
 
 // Follows the player: standard behind-the-shoulder tracking with idle drift
-// sway, plus the stair-descent look-target offset/camera orbit driven by
-// usePlayerController's stairBlendRef/stairOrbitTRef.
+// sway, plus the stair-descent look-target offset/camera pull-back driven by
+// usePlayerController's stairBlendRef/stairCameraTRef.
 export function useFollowCamera(
   groupRef: RefObject<Group>,
   yawRef: MutableRefObject<number>,
   fwdRef: MutableRefObject<Vector3>,
   stairBlendRef: MutableRefObject<number>,
-  stairOrbitTRef: MutableRefObject<number>,
+  stairCameraTRef: MutableRefObject<number>,
   movement: MutableRefObject<Movement>,
   playerRef: MutableRefObject<PlayerController>,
 ) {
@@ -111,16 +110,13 @@ export function useFollowCamera(
     lookTargetRef.current.lerp(_lookahead.current, LOOKAHEAD_LERP);
 
     // ── Camera ─────────────────────────────────────────────────────────────
-    const stairOrbitT = stairOrbitTRef.current;
-    const orbitAngle = stairOrbitT * Math.PI * 2 * STAIR_ORBIT_TURNS;
-    const orbitSwell = Math.sin(stairOrbitT * Math.PI);
-    const camAngle = yawRef.current + orbitAngle;
-    const stairCamDistance =
-      CAMERA_DISTANCE + STAIR_ORBIT_DISTANCE_OFFSET * orbitSwell;
+    const stairSwell = Math.sin(stairCameraTRef.current * Math.PI);
+    const camDistance =
+      CAMERA_DISTANCE + STAIR_CAMERA_DISTANCE_OFFSET * stairSwell;
     _targetCam.current.set(
-      pos.x + Math.sin(camAngle) * stairCamDistance,
-      pos.y + CAMERA_HEIGHT + STAIR_ORBIT_HEIGHT_OFFSET * orbitSwell,
-      pos.z + Math.cos(camAngle) * stairCamDistance,
+      pos.x + Math.sin(yawRef.current) * camDistance,
+      pos.y + CAMERA_HEIGHT + STAIR_CAMERA_HEIGHT_OFFSET * stairSwell,
+      pos.z + Math.cos(yawRef.current) * camDistance,
     );
     if (driftActiveRef.current) {
       const t = state.clock.elapsedTime;

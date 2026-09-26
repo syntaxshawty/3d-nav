@@ -8,8 +8,17 @@ import {
   STAIR_BASE_POSITION,
   STAIR_DESCEND_YAW,
   STAIR_ASCEND_YAW,
+  stairDistance,
+  stairPathY,
 } from '../data/deckGeometry';
 import { isInsideHouseFootprint } from '../data/houseGeometry';
+import {
+  crouchProgress,
+  JUMP_END_TIME,
+  jumpArcY,
+  jumpProgress,
+  planJump,
+} from './deckJump';
 import { SPAWN_POS, SPAWN_YAW } from '../data/spawn';
 import { shortestYawDelta } from '../mathUtils';
 import type { PlayerController } from './playerController';
@@ -18,20 +27,23 @@ const SPEED = 5;
 const TURN_SPEED = 2.5;
 
 // ── Stair transition — scripted walk down/up between the deck and the yard ──
-const STAIR_TRANSITION_DURATION = 1.4; // seconds
+const STAIR_TRANSITION_DURATION = 1.8; // seconds — an unhurried walk, not a leap
 
-// 0→1 factor (stairBlendRef) — the cat's downward pitch (AnimatedCat) and the
-// camera's look-target offsets (useFollowCamera) use this; eases smoothly
-// toward 1/0 over STAIR_BLEND_TIME independent of the transition's own timing.
+// Roughly how far the cat's front/back paws sit from its origin at
+// AnimatedCat's CAT_SCALE (front ~0.3, back ~0.4, from the skeleton's foot
+// bones) — used to rest both ends of the body on the stair path, and to tilt
+// it to match, so neither pair of paws sinks into a step.
+const PAW_HALF_SPAN = 0.4;
+
+// 0→1 factor (stairBlendRef) — the camera's look-target offsets
+// (useFollowCamera) use this; eases smoothly toward 1/0 over STAIR_BLEND_TIME
+// independent of the transition's own timing.
 const STAIR_BLEND_TIME = 0.55; // seconds to ease in/out
 
-// The camera's own orbit (see useFollowCamera) runs on its own independent
-// timer — deliberately longer than STAIR_TRANSITION_DURATION, so the camera
-// keeps sweeping for a bit even after the character finishes walking down
-// and normal control resumes. stairOrbitTRef below is that timer's
-// smoothstepped 0→1 progress; useFollowCamera turns it into the actual
-// orbit angle/swell.
-const STAIR_ORBIT_DURATION = STAIR_TRANSITION_DURATION * 2; // seconds — was too fast at 1x the walk duration
+// The camera's gentle pull-back on the way down (see useFollowCamera) runs on
+// its own timer: stairCameraTRef below is its smoothstepped 0→1 progress,
+// which useFollowCamera turns into a swell out and back.
+const STAIR_CAMERA_DURATION = STAIR_TRANSITION_DURATION; // seconds
 
 function smoothstep(t: number) {
   return t * t * (3 - 2 * t);
@@ -49,7 +61,10 @@ export function usePlayerController(
   const movingRef = useRef(false);
   const stairBlendRef = useRef(0);
   const fwdRef = useRef(new Vector3());
-  const stairOrbitTRef = useRef(0);
+  const stairCameraTRef = useRef(0);
+  // Nose-down tilt (radians) of the cat while on the stairs, so its body
+  // follows the slope — AnimatedCat applies it. 0 everywhere else.
+  const stairPitchRef = useRef(0);
 
   // Confines WASD movement to the deck's footprint (see isInsideDeckFootprint)
   // until a stair transition takes the player off it. There's no physics
@@ -68,13 +83,20 @@ export function usePlayerController(
   const scriptYawDelta = useRef(0);
   const scriptElapsed = useRef(0);
 
-  // The camera orbit runs on its own independent timer (STAIR_ORBIT_DURATION),
-  // separate from the scripted walk-down transition (STAIR_TRANSITION_DURATION)
-  // — the orbit takes longer than the walk itself, so it keeps sweeping for a
-  // bit even after the character finishes walking down and normal control
-  // resumes. Started alongside the 'down' transition, runs independently.
-  const orbitElapsed = useRef(0);
-  const orbitActive = useRef(false);
+  // Jump off a yard-facing deck edge — see playerRef.current.jumpDown below
+  // and deckJump.ts. Like the stair transition, replaces WASD entirely while
+  // it plays; exposed as jumpingRef so AnimatedCat plays the jump clip.
+  const jumping = useRef(false);
+  const jumpFrom = useRef(new Vector3());
+  const jumpTo = useRef(new Vector3());
+  const jumpFromYaw = useRef(0);
+  const jumpYawDelta = useRef(0);
+  const jumpElapsed = useRef(0);
+
+  // The camera pull-back's timer (STAIR_CAMERA_DURATION) — started alongside
+  // the 'down' transition, runs independently of it.
+  const cameraElapsed = useRef(0);
+  const cameraActive = useRef(false);
 
   // Write the stair-transition trigger into the ref so GardenView's E-key
   // handler can start it from outside this component.
@@ -91,8 +113,8 @@ export function usePlayerController(
           STAIR_DESCEND_YAW,
         );
         onDeck.current = false;
-        orbitElapsed.current = 0;
-        orbitActive.current = true;
+        cameraElapsed.current = 0;
+        cameraActive.current = true;
       } else {
         scriptTo.current.set(...STAIR_TOP_POSITION);
         scriptYawDelta.current = shortestYawDelta(
@@ -103,6 +125,26 @@ export function usePlayerController(
       }
       scriptElapsed.current = 0;
       scripted.current = true;
+    };
+
+    playerRef.current.jumpDown = () => {
+      if (scripted.current || jumping.current) return;
+      const pos = groupRef.current.position;
+      const plan = planJump(
+        pos.x,
+        pos.y,
+        pos.z,
+        fwdRef.current.x,
+        fwdRef.current.z,
+      );
+      if (!plan) return;
+      jumpFrom.current.copy(pos);
+      jumpTo.current.set(plan.toX, 0, plan.toZ);
+      jumpFromYaw.current = yawRef.current;
+      jumpYawDelta.current = shortestYawDelta(yawRef.current, plan.yaw);
+      jumpElapsed.current = 0;
+      jumping.current = true;
+      onDeck.current = false;
     };
   }, [playerRef]);
 
@@ -119,7 +161,22 @@ export function usePlayerController(
       scriptElapsed.current += delta;
       const t = Math.min(1, scriptElapsed.current / STAIR_TRANSITION_DURATION);
       const eased = smoothstep(t);
-      pos.copy(scriptFrom.current).lerp(scriptTo.current, eased);
+      pos.x =
+        scriptFrom.current.x +
+        (scriptTo.current.x - scriptFrom.current.x) * eased;
+      pos.z =
+        scriptFrom.current.z +
+        (scriptTo.current.z - scriptFrom.current.z) * eased;
+      // Height comes from the stair path rather than a straight lerp: the
+      // front and back paws each rest on it, the body sits midway between
+      // them, and tilts to match — so every paw stays on a tread or the
+      // deck instead of cutting through the steps.
+      const d = stairDistance(pos.x, pos.z);
+      const facing = scriptDirection.current === 'down' ? 1 : -1;
+      const frontY = stairPathY(d + facing * PAW_HALF_SPAN);
+      const backY = stairPathY(d - facing * PAW_HALF_SPAN);
+      pos.y = (frontY + backY) / 2;
+      stairPitchRef.current = Math.atan2(backY - frontY, PAW_HALF_SPAN * 2);
       yawRef.current = scriptFromYaw.current + scriptYawDelta.current * eased;
       // Kept current here too (normally only updated in the WASD branch
       // below) so the stair-descent look-target offset in useFollowCamera,
@@ -129,7 +186,30 @@ export function usePlayerController(
         0,
         -Math.cos(yawRef.current),
       );
-      if (t >= 1) scripted.current = false;
+      if (t >= 1) {
+        scripted.current = false;
+        stairPitchRef.current = 0;
+      }
+    } else if (jumping.current) {
+      // ── Jump off the deck edge ────────────────────────────────────────────
+      // Timed against the jump clip (deckJump.ts): turn to face straight out
+      // while crouching, then follow the arc from takeoff to touchdown, then
+      // stand at the landing spot while the clip settles.
+      jumpElapsed.current += delta;
+      const time = jumpElapsed.current;
+      yawRef.current =
+        jumpFromYaw.current +
+        jumpYawDelta.current * smoothstep(crouchProgress(time));
+      const s = jumpProgress(time);
+      pos.x = jumpFrom.current.x + (jumpTo.current.x - jumpFrom.current.x) * s;
+      pos.z = jumpFrom.current.z + (jumpTo.current.z - jumpFrom.current.z) * s;
+      pos.y = jumpArcY(jumpFrom.current.y, jumpTo.current.y, s);
+      fwdRef.current.set(
+        -Math.sin(yawRef.current),
+        0,
+        -Math.cos(yawRef.current),
+      );
+      if (time >= JUMP_END_TIME) jumping.current = false;
     } else if (
       !playerRef.current.animationLock &&
       !playerRef.current.movementLock
@@ -190,22 +270,22 @@ export function usePlayerController(
         );
     }
 
-    // ── Stair-camera orbit progress ─────────────────────────────────────────
-    // Runs on its own timer independent of `scripted` — see orbitActive's
-    // declaration above for why. Stays 0 whenever the orbit hasn't been
-    // started or has already finished, exactly like the original inline
-    // per-frame local variable did.
-    if (orbitActive.current) {
-      orbitElapsed.current += delta;
-      const t = Math.min(1, orbitElapsed.current / STAIR_ORBIT_DURATION);
-      stairOrbitTRef.current = smoothstep(t);
-      if (t >= 1) orbitActive.current = false;
+    // ── Stair-camera pull-back progress ─────────────────────────────────────
+    // Runs on its own timer independent of `scripted`. Stays 0 whenever it
+    // hasn't been started or has already finished.
+    if (cameraActive.current) {
+      cameraElapsed.current += delta;
+      const t = Math.min(1, cameraElapsed.current / STAIR_CAMERA_DURATION);
+      stairCameraTRef.current = smoothstep(t);
+      if (t >= 1) cameraActive.current = false;
     } else {
-      stairOrbitTRef.current = 0;
+      stairCameraTRef.current = 0;
     }
 
     const isMoving =
-      !scripted.current && (m.forward || m.backward || m.left || m.right);
+      !scripted.current &&
+      !jumping.current &&
+      (m.forward || m.backward || m.left || m.right);
     // The scripted stair transition also counts as "moving" for animation
     // purposes (the cat should walk, not idle, while it's being carried down
     // the stairs) — kept separate from isMoving itself so useFollowCamera's
@@ -223,7 +303,7 @@ export function usePlayerController(
     stairBlendRef.current += (stairTarget - stairBlendRef.current) * stairK;
 
     playerRef.current.transitioning =
-      scripted.current || playerRef.current.animationLock;
+      scripted.current || jumping.current || playerRef.current.animationLock;
   });
 
   const reset = useCallback(() => {
@@ -231,9 +311,11 @@ export function usePlayerController(
     yawRef.current = SPAWN_YAW;
     onDeck.current = true;
     scripted.current = false;
+    jumping.current = false;
     stairBlendRef.current = 0;
-    orbitActive.current = false;
-    orbitElapsed.current = 0;
+    stairPitchRef.current = 0;
+    cameraActive.current = false;
+    cameraElapsed.current = 0;
   }, []);
 
   return {
@@ -242,11 +324,9 @@ export function usePlayerController(
     movingRef,
     stairBlendRef,
     fwdRef,
-    stairOrbitTRef,
-    // Exposed so AnimatedCat can play JumpFw_IP instead of the normal
-    // walk cycle for exactly the scripted transition's duration (both
-    // directions), rather than inferring it from movingRef alone.
-    stairActiveRef: scripted,
+    stairCameraTRef,
+    stairPitchRef,
+    jumpingRef: jumping,
     reset,
   };
 }
