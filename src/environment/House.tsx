@@ -10,6 +10,7 @@ import {
   ROOF_EXTRUDE_DEPTH,
   FRENCH_DOOR_URL,
   FRENCH_DOOR_POSITION,
+  FRENCH_DOOR_ROTATION,
   FRENCH_DOOR_SCALE,
 } from '../data/houseGeometry';
 
@@ -40,6 +41,7 @@ export function House() {
       <GltfProp
         url={FRENCH_DOOR_URL}
         position={FRENCH_DOOR_POSITION}
+        rotation={FRENCH_DOOR_ROTATION}
         scale={FRENCH_DOOR_SCALE}
       />
     </group>

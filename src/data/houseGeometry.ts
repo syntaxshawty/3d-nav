@@ -47,21 +47,19 @@ export const ROOF_POSITION_Z = -ROOF_OVERHANG;
 export const ROOF_EXTRUDE_DEPTH = HOUSE_DEPTH + ROOF_OVERHANG * 2;
 
 // ── French doors ─────────────────────────────────────────────────────────
-// Centered on the wall (X=0, local space) and flush against its front face
-// (Z=0) — the door's own thin depth (~0.08) straddles that face, so it
-// pokes slightly proud of the wall into the yard, the way a real door slab
-// sits in its frame rather than being sunk into it.
 export const FRENCH_DOOR_URL = '/models/french_doors.glb';
 export const FRENCH_DOOR_SCALE = 3.5; // raw model is ~2m wide x 1.34m tall x 0.08m thick — tweak to resize
 // Raw model's own bottom edge (bboxMin.y from the source asset) is below its
 // local origin — this lifts it so the bottom rests on the ground (Y=0)
 // instead of straddling it.
 const FRENCH_DOOR_BASE_OFFSET = 0.9;
+const FRENCH_DOOR_WALL_CLEARANCE = 0.1;
 export const FRENCH_DOOR_POSITION: Vector3Tuple = [
   0,
   FRENCH_DOOR_BASE_OFFSET * FRENCH_DOOR_SCALE,
-  0,
+  -FRENCH_DOOR_WALL_CLEARANCE,
 ];
+export const FRENCH_DOOR_ROTATION: Vector3Tuple = [0, Math.PI, 0];
 
 // ── Footprint containment (exclusion) ───────────────────────────────────────
 // The player has no physics collision (plain kinematic XZ movement — see
