@@ -28,6 +28,13 @@ const FOCUS_FOG_FAR = 20;
 // so the depth and the color-grade read as one transition, not two.
 const FOG_LERP = 0.12;
 
+// The park HDRI has its own sun baked in, low on the horizon at roughly
+// (+x, +z) in world space. That sun — not the directionalLight — is what
+// lights up grazing-angle rims on glossy assets (berries, leaves), so it has
+// to be yawed to sit on the same side as the directionalLight in Scene.tsx
+// (currently coming from -x/+z). Re-derive this if the light moves.
+const ENV_YAW = -2.05; // radians
+
 export function SkyBackground({ fogActive = false }: { fogActive?: boolean }) {
   const fogRef = useRef<Fog>(null!);
 
@@ -60,6 +67,7 @@ export function SkyBackground({ fogActive = false }: { fogActive?: boolean }) {
         preset="park"
         background={false}
         environmentIntensity={0.7}
+        environmentRotation={[0, ENV_YAW, 0]}
       />
     </>
   );

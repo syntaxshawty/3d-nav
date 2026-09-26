@@ -160,15 +160,18 @@ export function Scene({
       <SkyBackground fogActive={fogActive} />
       <Clouds />
       <ambientLight intensity={0.6} />
+      {/* Sun comes in from -x/+z. The shadow camera bounds are in the light's
+          own view space, fitted to the yard (x -8..30, z -28..0, up to ~8
+          tall) for this direction — changing position means refitting them. */}
       <directionalLight
-        position={[10, 10, 5]}
+        position={[-10, 10, 5]}
         intensity={1}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-20}
-        shadow-camera-right={40}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-left={-30}
+        shadow-camera-right={15}
+        shadow-camera-top={34}
+        shadow-camera-bottom={-6}
         shadow-camera-near={0.5}
         shadow-camera-far={60}
       />
