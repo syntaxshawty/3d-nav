@@ -12,6 +12,9 @@ import { ProximityHint } from './components/ProximityHint';
 import { FocusLayoutImageRow } from './components/FocusLayoutImageRow';
 import { FocusLayoutNewspaper } from './components/FocusLayoutNewspaper';
 import { FocusLayoutStrawberry } from './components/FocusLayoutStrawberry';
+import { LoadingScreen } from './components/LoadingScreen';
+import { SceneErrorBoundary } from './components/SceneErrorBoundary';
+import { SceneReadySignal } from './components/SceneReadySignal';
 import { Scene } from './Scene';
 import { SPAWN_CAM_POS } from './data/spawn';
 import './focus.css';
@@ -69,10 +72,16 @@ function GardenView() {
   );
   // showHint starts true; set to false the first time any movement key is pressed.
   const [showHint, setShowHint] = useState(true);
+  // Loading screen state — see LoadingScreen.tsx. The scene loads behind it
+  // from the start; `entered` flips when the player dismisses it, and gates
+  // all input until then.
+  const [sceneReady, setSceneReady] = useState(false);
+  const [sceneFailed, setSceneFailed] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
-    playerRef.current.movementLock = !!activeObject;
-  }, [activeObject]);
+    playerRef.current.movementLock = !!activeObject || !entered;
+  }, [activeObject, entered]);
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -115,8 +124,12 @@ function GardenView() {
         setContentVisible(false);
         return;
       }
+      // !entered also covers the Enter press that dismisses the loading
+      // screen — this listener still sees entered=false for that event, so
+      // it can't double as "open the overlay I spawned next to".
       if (
         (e.key !== 'Enter' && e.key !== 'enter') ||
+        !entered ||
         !nearbyObjectRef.current ||
         activeObject ||
         playerRef.current.transitioning
@@ -138,11 +151,14 @@ function GardenView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeObject]);
+  }, [activeObject, entered]);
 
   // Fade the controls hint the first time the user presses any movement key.
-  // Once dismissed, we remove the listener — no ongoing overhead.
+  // Once dismissed, we remove the listener — no ongoing overhead. Not armed
+  // until the loading screen is dismissed, so keys mashed while loading
+  // don't hide it before it's ever been seen.
   useEffect(() => {
+    if (!entered) return;
     const MOVE_KEYS = new Set([
       'w',
       'W',
@@ -165,11 +181,18 @@ function GardenView() {
     };
     window.addEventListener('keydown', onFirstMove);
     return () => window.removeEventListener('keydown', onFirstMove);
-  }, []);
+  }, [entered]);
 
   return (
     <>
-      <ControlsHint visible={showHint} />
+      <LoadingScreen
+        ready={sceneReady}
+        failed={sceneFailed}
+        entered={entered}
+        onEnter={() => setEntered(true)}
+      />
+
+      <ControlsHint visible={entered && showHint} />
 
       {/* Reset button — always visible, top-right corner. Non-focusable
           (tabIndex -1) so it can't retain keyboard focus after a click —
@@ -250,21 +273,24 @@ function GardenView() {
           transition: `filter ${FOG_FADE_DURATION}s ease`,
         }}
       >
-        <Canvas
-          camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }}
-          shadows
-        >
-          <Suspense fallback={null}>
-            <Physics>
-              <Scene
-                movement={movement}
-                nearbyObjectRef={nearbyObjectRef}
-                playerRef={playerRef}
-                fogActive={fogVisible}
-              />
-            </Physics>
-          </Suspense>
-        </Canvas>
+        <SceneErrorBoundary onError={() => setSceneFailed(true)}>
+          <Canvas
+            camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }}
+            shadows
+          >
+            <Suspense fallback={null}>
+              <Physics>
+                <Scene
+                  movement={movement}
+                  nearbyObjectRef={nearbyObjectRef}
+                  playerRef={playerRef}
+                  fogActive={fogVisible}
+                />
+              </Physics>
+              <SceneReadySignal onReady={() => setSceneReady(true)} />
+            </Suspense>
+          </Canvas>
+        </SceneErrorBoundary>
       </div>
     </>
   );

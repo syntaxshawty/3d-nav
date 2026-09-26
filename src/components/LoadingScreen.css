@@ -1,0 +1,77 @@
+/* Background is the scene's flat sky color (SKY_COLOR in SkyBackground.tsx),
+   so fading out reads as the yard appearing under the same sky rather than a
+   cut from one screen to another. */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* above focus mode (200) and the reset/debug UI (100) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 0 16px;
+  background: #63b8ff;
+  color: #fff;
+  font-family: 'Freckle Face', system-ui;
+  text-align: center;
+  transition: opacity 0.8s ease;
+}
+
+.loading-screen--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-title {
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 400;
+}
+
+/* Fixed height so swapping the bar for the prompt doesn't shift the title. */
+.loading-status {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-bar {
+  width: min(240px, 60vw);
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: #fff;
+  transition: width 0.4s ease;
+}
+
+.loading-prompt {
+  font-size: 18px;
+  cursor: pointer;
+  animation: loading-pulse 2s ease-in-out infinite;
+}
+
+.loading-message {
+  font-size: 18px;
+}
+
+@keyframes loading-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-prompt {
+    animation: none;
+  }
+}

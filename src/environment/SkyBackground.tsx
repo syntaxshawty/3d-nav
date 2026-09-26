@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Environment } from '@react-three/drei';
+import { Environment, useEnvironment } from '@react-three/drei';
 import type { Fog } from 'three';
 
 // ── Atmosphere constants — tweak to reshape the sky/fog feel ──────────────────
@@ -35,6 +35,11 @@ const FOG_LERP = 0.12;
 // (currently coming from -x/+z). Re-derive this if the light moves.
 const ENV_YAW = -2.05; // radians
 
+// drei's `preset="park"` HDRI, self-hosted instead of fetched from drei's
+// third-party CDN mirror at runtime — one less external request that can
+// stall the loading screen.
+const ENV_FILE = '/hdri/rooitou_park_1k.hdr';
+
 export function SkyBackground({ fogActive = false }: { fogActive?: boolean }) {
   const fogRef = useRef<Fog>(null!);
 
@@ -64,7 +69,7 @@ export function SkyBackground({ fogActive = false }: { fogActive?: boolean }) {
         real work on the shed, deck, and fence.
       */}
       <Environment
-        preset="park"
+        files={ENV_FILE}
         background={false}
         environmentIntensity={0.7}
         environmentRotation={[0, ENV_YAW, 0]}
@@ -72,3 +77,7 @@ export function SkyBackground({ fogActive = false }: { fogActive?: boolean }) {
     </>
   );
 }
+
+// Kick off loading as soon as the module runs, alongside the GLB preloads,
+// so the loading screen's progress count includes it from the start.
+useEnvironment.preload({ files: ENV_FILE });
