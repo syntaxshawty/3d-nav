@@ -1,23 +1,23 @@
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Canvas } from '@react-three/fiber'
-import { Physics } from '@react-three/rapier'
-import { useInput } from './systems/useInput'
-import { createPlayerController } from './systems/playerController'
-import { type InteractiveObject } from './data/interactiveObjects'
-import { CONTENT_FADE_DURATION } from './data/focusTiming'
-import { ControlsHint } from './components/ControlsHint'
-import { FocusHint } from './components/FocusHint'
-import { ProximityHint } from './components/ProximityHint'
-import { FocusLayoutImageRow } from './components/FocusLayoutImageRow'
-import { FocusLayoutNewspaper } from './components/FocusLayoutNewspaper'
-import { FocusLayoutStrawberry } from './components/FocusLayoutStrawberry'
-import { Scene } from './Scene'
-import { SPAWN_CAM_POS } from './data/spawn'
-import './focus.css'
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Canvas } from '@react-three/fiber';
+import { Physics } from '@react-three/rapier';
+import { useInput } from './systems/useInput';
+import { createPlayerController } from './systems/playerController';
+import { type InteractiveObject } from './data/interactiveObjects';
+import { CONTENT_FADE_DURATION } from './data/focusTiming';
+import { ControlsHint } from './components/ControlsHint';
+import { FocusHint } from './components/FocusHint';
+import { ProximityHint } from './components/ProximityHint';
+import { FocusLayoutImageRow } from './components/FocusLayoutImageRow';
+import { FocusLayoutNewspaper } from './components/FocusLayoutNewspaper';
+import { FocusLayoutStrawberry } from './components/FocusLayoutStrawberry';
+import { Scene } from './Scene';
+import { SPAWN_CAM_POS } from './data/spawn';
+import './focus.css';
 
 // ── Scale / child's-eye-view tuning ─────────────────────────────────────────
-const CAM_FOV = 58   // narrower than a fisheye-wide FOV — keeps the world from feeling flat/distant
+const CAM_FOV = 58; // narrower than a fisheye-wide FOV — keeps the world from feeling flat/distant
 
 // ── Focus mode pacing ─────────────────────────────────────────────────────
 // Two-stage reveal: the fog (scene fog + canvas blur + fog gradient) rolls in
@@ -25,16 +25,16 @@ const CAM_FOV = 58   // narrower than a fisheye-wide FOV — keeps the world fro
 // then the layout component (see FocusLayout*) fades in on top of it, using
 // the same CONTENT_FADE_DURATION. Closing reverses the order (content out,
 // then fog out) rather than just running the same timeline backwards.
-const FOG_FADE_DURATION = 2.5  // seconds — how long the fog itself takes to fade in/out
+const FOG_FADE_DURATION = 2.5; // seconds — how long the fog itself takes to fade in/out
 // Scene desaturates/softens to feel like it's receding into memory, without
 // losing the environment entirely — it stays visible (and interactive)
 // behind the fog.
-const FOCUS_SCENE_FILTER = 'blur(4px) saturate(0.4) brightness(0.75)'
+const FOCUS_SCENE_FILTER = 'blur(4px) saturate(0.4) brightness(0.75)';
 
 // The walking scene: owns all state, renders HTML layer + Canvas
 function GardenView() {
-  const movement       = useInput()
-  const nearbyObjectRef = useRef<InteractiveObject | null>(null)
+  const movement = useInput();
+  const nearbyObjectRef = useRef<InteractiveObject | null>(null);
   // Groups every player-owned control (reset/useStairs/playAnimation
   // actions, transitioning/animationLock/movementLock state) behind one
   // ref instead of six separate ones — see playerController.ts.
@@ -43,7 +43,7 @@ function GardenView() {
   // on the fog/content fade), so there's no window where the player can
   // wander off mid-interaction, and cleared the instant it closes so
   // control comes back immediately rather than waiting out the closing fade.
-  const playerRef = useRef(createPlayerController())
+  const playerRef = useRef(createPlayerController());
 
   // Only ever holds an object whose action is 'open-overlay' — action
   // triggers (e.g. the stairs) short-circuit in the E-key handler below
@@ -51,48 +51,58 @@ function GardenView() {
   // (InteractiveObject covers both kinds) since that invariant lives in
   // the handler's control flow, not the data shape — see the render check
   // below for where that gets asserted via focusObject.action.type.
-  const [activeObject, setActiveObject] = useState<InteractiveObject | null>(null)
+  const [activeObject, setActiveObject] = useState<InteractiveObject | null>(
+    null,
+  );
   // Drives the fog (scene fog + canvas blur + fog gradient) — the first
   // stage of the reveal, kept separate from activeObject so it can fade in
   // after a short delay instead of popping in the instant E is pressed.
-  const [fogVisible, setFogVisible] = useState(false)
+  const [fogVisible, setFogVisible] = useState(false);
   // Drives the title/description/image fade + slide — the second stage,
   // only turned on once the fog has finished arriving.
-  const [contentVisible, setContentVisible] = useState(false)
+  const [contentVisible, setContentVisible] = useState(false);
   // The object actually rendered by focus mode — stays populated until both
   // stages have finished fading out, so closing has something to animate
   // instead of the content vanishing instantly.
-  const [focusObject, setFocusObject] = useState<InteractiveObject | null>(null)
+  const [focusObject, setFocusObject] = useState<InteractiveObject | null>(
+    null,
+  );
   // showHint starts true; set to false the first time any movement key is pressed.
-  const [showHint, setShowHint] = useState(true)
+  const [showHint, setShowHint] = useState(true);
 
   useEffect(() => {
-    playerRef.current.movementLock = !!activeObject
-  }, [activeObject])
+    playerRef.current.movementLock = !!activeObject;
+  }, [activeObject]);
 
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = []
+    const timers: ReturnType<typeof setTimeout>[] = [];
 
     if (activeObject) {
-      setFocusObject(activeObject)
       // Stage 1: fog rolls in on its own...
-      timers.push(setTimeout(() => {
-        setFogVisible(true)
-        // ...stage 2: content follows once the fog has arrived.
-        timers.push(setTimeout(() => setContentVisible(true), FOG_FADE_DURATION * 1000))
-      }))
+      timers.push(
+        setTimeout(() => {
+          setFogVisible(true);
+          // ...stage 2: content follows once the fog has arrived.
+          timers.push(
+            setTimeout(() => setContentVisible(true), FOG_FADE_DURATION * 1000),
+          );
+        }),
+      );
     } else {
       // Closing reverses the order: content fades out first...
-      setContentVisible(false)
-      timers.push(setTimeout(() => {
-        setFogVisible(false)
-        // ...then the fog, then the object itself unmounts.
-        timers.push(setTimeout(() => setFocusObject(null), FOG_FADE_DURATION * 1000))
-      }, CONTENT_FADE_DURATION * 1000))
+      timers.push(
+        setTimeout(() => {
+          setFogVisible(false);
+          // ...then the fog, then the object itself unmounts.
+          timers.push(
+            setTimeout(() => setFocusObject(null), FOG_FADE_DURATION * 1000),
+          );
+        }, CONTENT_FADE_DURATION * 1000),
+      );
     }
 
-    return () => timers.forEach(clearTimeout)
-  }, [activeObject])
+    return () => timers.forEach(clearTimeout);
+  }, [activeObject]);
 
   // Interaction on E: objects with a scripted `action` (the stair trigger
   // points) play that instead of opening focus mode. Blocked while a
@@ -101,37 +111,61 @@ function GardenView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && activeObject) {
-        setActiveObject(null)
-        return
+        setActiveObject(null);
+        setContentVisible(false);
+        return;
       }
-      if ((e.key !== 'Enter' && e.key !== 'enter') || !nearbyObjectRef.current || activeObject || playerRef.current.transitioning) return
-      const obj = nearbyObjectRef.current
-      if (obj.animation) playerRef.current.playAnimation(obj.animation)
+      if (
+        (e.key !== 'Enter' && e.key !== 'enter') ||
+        !nearbyObjectRef.current ||
+        activeObject ||
+        playerRef.current.transitioning
+      )
+        return;
+      const obj = nearbyObjectRef.current;
+      if (obj.animation) playerRef.current.playAnimation(obj.animation);
       // action is always a defined object now (a proper 3-way discriminated
       // union on .type), so this is a plain positive-check chain — no more
       // undefined-vs-literal narrowing workaround needed here.
-      if (obj.action.type === 'descend-stairs')      playerRef.current.useStairs('down')
-      else if (obj.action.type === 'ascend-stairs')  playerRef.current.useStairs('up')
-      else if (obj.action.type === 'open-overlay')   setActiveObject(obj)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [activeObject])
+      if (obj.action.type === 'descend-stairs')
+        playerRef.current.useStairs('down');
+      else if (obj.action.type === 'ascend-stairs')
+        playerRef.current.useStairs('up');
+      else if (obj.action.type === 'open-overlay') {
+        setActiveObject(obj);
+        setFocusObject(obj);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeObject]);
 
   // Fade the controls hint the first time the user presses any movement key.
   // Once dismissed, we remove the listener — no ongoing overhead.
   useEffect(() => {
-    const MOVE_KEYS = new Set(['w','W','s','S','a','A','d','D',
-      'ArrowUp','ArrowDown','ArrowLeft','ArrowRight'])
+    const MOVE_KEYS = new Set([
+      'w',
+      'W',
+      's',
+      'S',
+      'a',
+      'A',
+      'd',
+      'D',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+    ]);
     const onFirstMove = (e: KeyboardEvent) => {
       if (MOVE_KEYS.has(e.key)) {
-        setShowHint(false)
-        window.removeEventListener('keydown', onFirstMove)
+        setShowHint(false);
+        window.removeEventListener('keydown', onFirstMove);
       }
-    }
-    window.addEventListener('keydown', onFirstMove)
-    return () => window.removeEventListener('keydown', onFirstMove)
-  }, [])
+    };
+    window.addEventListener('keydown', onFirstMove);
+    return () => window.removeEventListener('keydown', onFirstMove);
+  }, []);
 
   return (
     <>
@@ -141,14 +175,20 @@ function GardenView() {
           (tabIndex -1) so it can't retain keyboard focus after a click —
           otherwise a focused button intercepts the next Enter keypress as a
           native click, resetting position instead of opening focus mode. */}
-      <button className="reset-button" tabIndex={-1} onClick={() => playerRef.current.reset()}>
+      <button
+        className="reset-button"
+        tabIndex={-1}
+        onClick={() => playerRef.current.reset()}
+      >
         take me home
       </button>
 
       {/* Debug overlay — dev-only */}
       {import.meta.env.DEV && (
         <pre id="debug" className="debug-panel">
-          {'player  x: 0.00  z: 0.00  yaw: 0.00\nmoving  none\ncamera  x: 0.00  y: 5.50  z: 8.00\ndist    8.00  nearby: none\ndrift   no'}
+          {
+            'player  x: 0.00  z: 0.00  yaw: 0.00\nmoving  none\ncamera  x: 0.00  y: 5.50  z: 8.00\ndist    8.00  nearby: none\ndrift   no'
+          }
         </pre>
       )}
 
@@ -179,13 +219,24 @@ function GardenView() {
       {focusObject && focusObject.action.type === 'open-overlay' && (
         <div className="focus-content">
           {focusObject.action.overlay.layout === 'image-row' && (
-            <FocusLayoutImageRow title={focusObject.title} overlay={focusObject.action.overlay} visible={contentVisible} />
+            <FocusLayoutImageRow
+              title={focusObject.title}
+              overlay={focusObject.action.overlay}
+              visible={contentVisible}
+            />
           )}
           {focusObject.action.overlay.layout === 'newspaper-style' && (
-            <FocusLayoutNewspaper title={focusObject.title} overlay={focusObject.action.overlay} visible={contentVisible} />
+            <FocusLayoutNewspaper
+              title={focusObject.title}
+              overlay={focusObject.action.overlay}
+              visible={contentVisible}
+            />
           )}
           {focusObject.action.overlay.layout === 'strawberry-style' && (
-            <FocusLayoutStrawberry overlay={focusObject.action.overlay} visible={contentVisible} />
+            <FocusLayoutStrawberry
+              overlay={focusObject.action.overlay}
+              visible={contentVisible}
+            />
           )}
         </div>
       )}
@@ -199,7 +250,10 @@ function GardenView() {
           transition: `filter ${FOG_FADE_DURATION}s ease`,
         }}
       >
-        <Canvas camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }} shadows>
+        <Canvas
+          camera={{ position: SPAWN_CAM_POS.toArray(), fov: CAM_FOV }}
+          shadows
+        >
           <Suspense fallback={null}>
             <Physics>
               <Scene
@@ -213,7 +267,7 @@ function GardenView() {
         </Canvas>
       </div>
     </>
-  )
+  );
 }
 
 export default function App() {
@@ -223,5 +277,5 @@ export default function App() {
         <Route path="/" element={<GardenView />} />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
